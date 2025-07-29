@@ -1,0 +1,38 @@
+# Configuración de AWS
+aws_region = "us-east-1"
+
+# Ambiente de despliegue
+environment = "dev"
+
+# Nombre del proyecto
+project_name = "medivoice-ai"
+
+# Configuración de Cognito
+cognito_domain_prefix = "medivoice"
+cognito_callback_urls = [
+  "http://localhost:3000/callback",
+  "http://localhost:5173/callback",
+  "https://medivoice-ai-dev.s3-website-us-east-1.amazonaws.com/callback"
+]
+cognito_logout_urls = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://medivoice-ai-dev.s3-website-us-east-1.amazonaws.com"
+]
+
+# Configuración de Lambda
+lambda_timeout = 300
+lambda_memory_size = 512
+
+# Configuración de API Gateway
+api_gateway_rate_limit = 100
+
+# Configuración de Bedrock
+bedrock_model_id = "anthropic.claude-3-sonnet-20240229-v1:0"
+
+# Configuración de Transcribe
+transcribe_medical = true
+
+# Configuración de logs
+enable_cloudwatch_logs = true
+enable_xray_tracing = false 

@@ -1,0 +1,94 @@
+{
+  "name": "medivoice-ai",
+  "version": "1.0.0",
+  "description": "Sistema de asistencia médica con IA - Transcripción automática y análisis con Claude 3",
+  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "setup": "chmod +x scripts/*.sh && ./scripts/setup.sh",
+    "deploy": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh",
+    "destroy": "chmod +x scripts/destroy.sh && ./scripts/destroy.sh",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd frontend && npm test",
+    "test:backend": "cd backend && npm test",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:backend": "cd backend && npm run lint",
+    "format": "prettier --write .",
+    "install:all": "npm install && npm run install:frontend && npm run install:backend",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend && npm install",
+    "clean": "npm run clean:frontend && npm run clean:backend && npm run clean:infra",
+    "clean:frontend": "cd frontend && rm -rf node_modules dist",
+    "clean:backend": "cd backend && rm -rf node_modules .serverless",
+    "clean:infra": "cd infra && rm -rf .terraform terraform.tfstate*",
+    "logs": "aws logs tail /aws/lambda/medivoice-ai --follow",
+    "logs:backend": "cd backend && npm run logs",
+    "status": "cd infra && terraform show",
+    "outputs": "cd infra && terraform output",
+    "validate": "npm run validate:terraform && npm run validate:serverless",
+    "validate:terraform": "cd infra && terraform validate",
+    "validate:serverless": "cd backend && serverless print",
+    "costs": "aws ce get-cost-and-usage --time-period Start=$(date -d '1 month ago' +%Y-%m-%d),End=$(date +%Y-%m-%d) --granularity MONTHLY --metrics BlendedCost",
+    "security-scan": "npm audit && cd frontend && npm audit && cd ../backend && npm audit"
+  },
+  "keywords": [
+    "medical",
+    "ai",
+    "transcription",
+    "aws",
+    "bedrock",
+    "claude",
+    "serverless",
+    "react",
+    "terraform",
+    "healthcare"
+  ],
+  "author": "MediVoice AI Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/medivoice/medivoice-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/medivoice/medivoice-ai/issues"
+  },
+  "homepage": "https://github.com/medivoice/medivoice-ai#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.0.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm run test"
+    }
+  }
+} 

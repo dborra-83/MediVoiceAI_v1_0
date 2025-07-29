@@ -1,0 +1,13 @@
+{
+  "name": "upload-audio-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function for uploading audio files to S3",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1470.0",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 

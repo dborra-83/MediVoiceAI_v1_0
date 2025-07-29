@@ -21,7 +21,7 @@
     "@aws-sdk/client-bedrock": "^3.400.0",
     "aws-lambda": "^1.0.7",
     "uuid": "^9.0.0",
-    "jsPDF": "^2.5.1",
+    "jspdf": "^2.5.1",
     "html2canvas": "^1.4.1"
   },
   "devDependencies": {

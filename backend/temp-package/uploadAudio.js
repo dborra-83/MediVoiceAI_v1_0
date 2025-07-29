@@ -1,6 +1,10 @@
-// UploadAudio simplificado sin dependencias externas
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
+const { v4: uuidv4 } = require('uuid')
+
+const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
+
 exports.handler = async (event) => {
-  console.log('=== UPLOAD AUDIO SIMPLIFICADO ===')
+  console.log('=== UPLOAD AUDIO REAL - AMAZON S3 ===')
   console.log('Event:', JSON.stringify(event, null, 2))
 
   const corsHeaders = {
@@ -19,9 +23,9 @@ exports.handler = async (event) => {
       }
     }
 
-    // Handle POST - versión simplificada
+    // Handle POST with real S3 upload
     if (event.httpMethod === 'POST') {
-      console.log('Handling POST request for uploadAudio - SIMPLIFICADO')
+      console.log('Handling POST request for uploadAudio - REAL S3')
       
       // Parsear body
       let body
@@ -53,15 +57,16 @@ exports.handler = async (event) => {
         }
       }
 
-      // Generar key único para S3 (simulado)
-      const audioKey = `audio/${doctorId}/${Date.now()}-${fileName || 'recording.wav'}`
+      // Generar key único para S3
+      const audioKey = `audio/${doctorId}/${uuidv4()}-${fileName || 'recording.wav'}`
       const timestamp = new Date().toISOString()
 
-      console.log(`Simulando subida a S3: ${audioKey}`)
+      console.log(`Subiendo audio REAL a S3: ${audioKey}`)
 
-      // Simular validación de tamaño
+      // Decodificar audio de base64
       const audioBuffer = Buffer.from(audioData, 'base64')
       
+      // Validar tamaño (máximo 10MB)
       if (audioBuffer.length > 10 * 1024 * 1024) {
         return {
           statusCode: 400,
@@ -75,8 +80,21 @@ exports.handler = async (event) => {
         }
       }
 
-      // Simular respuesta exitosa
-      console.log('Audio procesado exitosamente (simulado)')
+      // Subir a S3 REAL
+      const s3Params = {
+        Bucket: process.env.AUDIO_BUCKET_NAME,
+        Key: audioKey,
+        Body: audioBuffer,
+        ContentType: contentType || 'audio/wav',
+        Metadata: {
+          doctorId: doctorId,
+          uploadedAt: timestamp,
+          originalFileName: fileName || 'recording.wav'
+        }
+      }
+
+      const s3Response = await s3Client.send(new PutObjectCommand(s3Params))
+      console.log('Audio subido exitosamente a S3 REAL:', s3Response.ETag)
 
       return {
         statusCode: 200,
@@ -91,9 +109,9 @@ exports.handler = async (event) => {
           size: audioBuffer.length,
           uploadedAt: timestamp,
           doctorId: doctorId,
-          s3ETag: 'simulated-etag-' + Date.now(),
+          s3ETag: s3Response.ETag,
           services: {
-            storage: "Amazon S3 (SIMULADO - Listo para REAL)"
+            storage: "Amazon S3 (REAL)"
           }
         })
       }
@@ -113,7 +131,7 @@ exports.handler = async (event) => {
     }
 
   } catch (error) {
-    console.error('UPLOAD AUDIO SIMPLIFICADO ERROR:', error)
+    console.error('UPLOAD AUDIO REAL ERROR:', error)
     console.error('Stack:', error.stack)
     
     return {

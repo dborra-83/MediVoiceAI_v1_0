@@ -1,0 +1,8 @@
+{
+  "httpMethod": "POST",
+  "body": "{\"audioData\":\"UklGRhwBAABXQVZFZm10IBAAAAABAAEAIlYAAEQrAAACABAAZGF0YfgAAACBhYqVbF1fdJiVmH91dEW\",\"fileName\":\"test_audio.webm\",\"contentType\":\"audio/webm\",\"doctorId\":\"test-doctor-123\"}",
+  "headers": {
+    "Content-Type": "application/json",
+    "Origin": "http://localhost:5173"
+  }
+} 

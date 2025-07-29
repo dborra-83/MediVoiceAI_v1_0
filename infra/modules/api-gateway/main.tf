@@ -62,8 +62,10 @@ resource "aws_api_gateway_method" "upload_audio" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.audio.id
   http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
+  # Temporal: Sin autenticación para testing
+  # authorization = "COGNITO_USER_POOLS"
+  # authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Método POST para procesamiento de audio
@@ -71,8 +73,10 @@ resource "aws_api_gateway_method" "process_audio" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.process.id
   http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
+  # Temporal: Sin autenticación para testing
+  # authorization = "COGNITO_USER_POOLS"
+  # authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Método POST para generación de PDF
@@ -80,8 +84,10 @@ resource "aws_api_gateway_method" "generate_pdf" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.pdf.id
   http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
+  # Temporal: Sin autenticación para testing
+  # authorization = "COGNITO_USER_POOLS"
+  # authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Método GET para historial
@@ -89,8 +95,10 @@ resource "aws_api_gateway_method" "get_history" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.history.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
+  # Temporal: Sin autenticación para testing
+  # authorization = "COGNITO_USER_POOLS"
+  # authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Método OPTIONS para CORS (subida de audio)
@@ -222,16 +230,15 @@ resource "aws_api_gateway_method_response" "options_history_200" {
   }
 }
 
-# Integraciones CORS para OPTIONS (una por recurso)
+# Integraciones CORS para OPTIONS - usar Lambda en lugar de Mock
 resource "aws_api_gateway_integration" "options_audio" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.audio.id
   http_method = aws_api_gateway_method.options_audio.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
+  
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.upload_audio_lambda_invoke_arn
 }
 
 resource "aws_api_gateway_integration" "options_process" {
@@ -267,21 +274,7 @@ resource "aws_api_gateway_integration" "options_history" {
   }
 }
 
-# Respuestas de integración CORS
-resource "aws_api_gateway_integration_response" "options_audio" {
-  depends_on = [aws_api_gateway_integration.options_audio]
-  
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.audio.id
-  http_method = aws_api_gateway_method.options_audio.http_method
-  status_code = aws_api_gateway_method_response.options_audio_200.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-}
+# AWS_PROXY maneja las respuestas automáticamente, no necesitamos integration_response
 
 resource "aws_api_gateway_integration_response" "options_process" {
   depends_on = [aws_api_gateway_integration.options_process]
@@ -342,6 +335,20 @@ resource "aws_api_gateway_deployment" "main" {
   ]
 
   rest_api_id = aws_api_gateway_rest_api.main.id
+  
+  # Forzar redeploy cuando cambie la configuración
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_method.upload_audio.id,
+      aws_api_gateway_method.process_audio.id,
+      aws_api_gateway_method.generate_pdf.id,
+      aws_api_gateway_method.get_history.id,
+      aws_api_gateway_integration.upload_audio.id,
+      aws_api_gateway_integration.process_audio.id,
+      aws_api_gateway_integration.generate_pdf.id,
+      aws_api_gateway_integration.get_history.id,
+    ]))
+  }
 
   lifecycle {
     create_before_destroy = true

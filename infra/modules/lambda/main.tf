@@ -178,7 +178,7 @@ resource "aws_lambda_function" "upload_audio" {
   filename         = data.archive_file.upload_audio.output_path
   function_name    = "${var.project_name}-${var.environment}-upload-audio"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "index.handler"
+  handler         = "uploadAudio.handler"
   runtime         = "nodejs18.x"
   timeout         = 30
   memory_size     = 512

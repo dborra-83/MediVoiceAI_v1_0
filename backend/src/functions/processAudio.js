@@ -82,9 +82,9 @@ exports.handler = async (event) => {
         };
       }
 
-      const { audioKey, patientId, doctorId, specialty = 'general', checkStatus = false, consultationId: existingId } = body;
+      const { audioKey, patientId, doctorId, specialty = 'general', checkStatus = false, consultationId: existingId, saveOnly = false, transcription, transcriptionWithSpeakers, aiAnalysis } = body;
 
-      if (!audioKey) {
+      if (!audioKey && !saveOnly) {
         return {
           statusCode: 400,
           headers: {
@@ -92,7 +92,7 @@ exports.handler = async (event) => {
             ...corsHeaders
           },
           body: JSON.stringify({ 
-            error: 'audioKey is required' 
+            error: 'audioKey is required for processing (not required for saveOnly)' 
           })
         };
       }
@@ -109,6 +109,55 @@ exports.handler = async (event) => {
       console.log(`Processing audio OPTIMIZED: ${audioKey}`);
 
       try {
+        // Handle save-only request (manual save to history)
+        if (saveOnly && transcription && aiAnalysis) {
+          console.log('💾 Processing saveOnly request - saving to DynamoDB...');
+          
+          if (process.env.CONSULTATIONS_TABLE) {
+            const consultationData = {
+              consultation_id: consultationId,
+              doctor_id: currentDoctorId,
+              patient_id: currentPatientId,
+              audio_key: audioKey || `manual-save-${Date.now()}`,
+              transcription: transcription,
+              transcription_with_speakers: transcriptionWithSpeakers || transcription,
+              ai_analysis: aiAnalysis,
+              specialty: specialty,
+              status: 'completed',
+              created_at: timestamp,
+              updated_at: timestamp
+            };
+
+            const putCommand = new PutCommand({
+              TableName: process.env.CONSULTATIONS_TABLE,
+              Item: consultationData
+            });
+
+            await docClient.send(putCommand);
+            console.log('✅ Manual consultation saved to DynamoDB:', consultationId);
+            
+            return {
+              statusCode: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders
+              },
+              body: JSON.stringify({
+                success: true,
+                consultationId,
+                message: 'Consulta guardada exitosamente en el historial',
+                timestamp,
+                patientId: currentPatientId,
+                doctorId: currentDoctorId,
+                specialty,
+                realAWS: true
+              })
+            };
+          } else {
+            throw new Error('CONSULTATIONS_TABLE not configured');
+          }
+        }
+
         // If this is a status check, check transcription status
         if (checkStatus && existingId) {
           const jobName = `transcription-${existingId}`;

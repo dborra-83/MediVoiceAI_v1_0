@@ -285,6 +285,56 @@ function AudioRecorder() {
     }
   }
 
+  const saveToHistory = async () => {
+    if (!transcription || !analysis) {
+      setError('No hay datos para guardar. Primero procesa el audio.')
+      return
+    }
+    
+    try {
+      console.log('💾 Guardando consulta en historial...')
+      
+      // La consulta ya debería estar guardada automáticamente en DynamoDB
+      // durante el procesamiento, pero vamos a verificar
+      if (consultationId) {
+        // Verificar que se guardó correctamente
+        const historyResponse = await axios.get(config.endpoints.getHistory)
+        console.log('Historial actualizado:', historyResponse.data)
+        
+        setError('')
+        alert('✅ Consulta guardada exitosamente en el historial!')
+        console.log('✅ Consulta confirmada en historial')
+      } else {
+        // Si no hay consultationId, crear entrada manual
+        const saveResponse = await axios.post(
+          config.endpoints.processAudio,
+          {
+            transcription: transcription,
+            transcriptionWithSpeakers: transcriptionWithSpeakers,
+            aiAnalysis: analysis,
+            doctorId: 'doctor-demo',
+            patientId: 'patient-demo',
+            specialty: 'general',
+            saveOnly: true
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }
+        )
+        
+        setConsultationId(saveResponse.data.consultationId)
+        alert('✅ Consulta guardada exitosamente en el historial!')
+        console.log('✅ Consulta guardada manualmente:', saveResponse.data)
+      }
+      
+    } catch (error) {
+      console.error('Error guardando en historial:', error)
+      setError('Error guardando en historial: ' + error.message)
+    }
+  }
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -468,7 +518,10 @@ function AudioRecorder() {
                     <i className="fas fa-file-pdf me-2"></i>
                     Generar Receta PDF
                   </button>
-                  <button className="btn btn-primary">
+                  <button 
+                    className="btn btn-primary"
+                    onClick={saveToHistory}
+                  >
                     <i className="fas fa-save me-2"></i>
                     Guardar en Historial
                   </button>

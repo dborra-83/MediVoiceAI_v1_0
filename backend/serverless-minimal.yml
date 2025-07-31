@@ -1,0 +1,38 @@
+service: medivoice-ai-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: dev
+  timeout: 30
+  memorySize: 512
+
+functions:
+  processAudio:
+    handler: src/functions/processAudio.handler
+    timeout: 30
+    memorySize: 1024
+    environment:
+      AUDIO_BUCKET_NAME: medivoice-audio-storage-dev
+      CONSULTATIONS_TABLE: medivoice-consultations-dev
+      BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20240620-v1:0
+    events:
+      - http:
+          path: /api/audio/process
+          method: post
+          cors: true
+
+  getHistory:
+    handler: src/functions/getHistory.handler
+    timeout: 30
+    memorySize: 512
+    environment:
+      CONSULTATIONS_TABLE: medivoice-consultations-dev
+    events:
+      - http:
+          path: /api/history
+          method: get
+          cors: true

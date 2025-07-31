@@ -3,21 +3,23 @@
 [![AWS](https://img.shields.io/badge/AWS-Cloud-orange)](https://aws.amazon.com/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org/)
-[![Terraform](https://img.shields.io/badge/Terraform-IaC-purple)](https://terraform.io/)
 [![Serverless](https://img.shields.io/badge/Serverless-Lambda-yellow)](https://serverless.com/)
+[![Claude](https://img.shields.io/badge/Claude-3.5_Sonnet-purple)](https://claude.ai/)
 
 ## 🎯 Descripción
 
-**MediVoice AI** es un sistema completo de asistencia médica que utiliza Inteligencia Artificial para automatizar el proceso de consultas médicas. Permite grabar conversaciones médico-paciente, transcribirlas automáticamente y generar análisis médicos completos con sugerencias de tratamiento.
+**MediVoice AI** es un sistema completo de asistencia médica que utiliza Inteligencia Artificial para automatizar el proceso de consultas médicas. Permite grabar conversaciones médico-paciente, transcribirlas automáticamente con separación de hablantes y generar análisis médicos completos con sugerencias de tratamiento.
 
 ### ✨ Características Principales
 
 - 🎤 **Grabación de Audio Médico** - Captura consultas médicas con límite de 3 minutos
-- 🔊 **Transcripción Automática** - Amazon Transcribe Medical especializado en terminología médica
-- 🧠 **Análisis con IA** - Claude 3 Sonnet para generar análisis médicos detallados
+- 🎭 **Separación de Hablantes** - Identifica automáticamente Doctor, Paciente, Acompañante, Familiar
+- 🔊 **Transcripción Automática** - Amazon Transcribe en español con identificación de hablantes
+- 🧠 **Análisis con IA** - Claude 3.5 Sonnet para generar análisis médicos detallados
 - 📄 **Generación de Recetas PDF** - Recetas médicas profesionales automáticas
-- 📋 **Historial Completo** - Base de datos de consultas con búsqueda avanzada
-- 🔐 **Seguridad Médica** - Autenticación robusta y cifrado de datos
+- 📋 **Historial Real** - Base de datos DynamoDB con consultas reales (no mock data)
+- 💾 **Guardado Manual** - Función para guardar consultas al historial
+- ⚡ **Procesamiento Asíncrono** - Manejo de archivos largos con polling automático
 - ☁️ **Arquitectura Serverless** - Escalabilidad automática y costos optimizados
 
 ---

@@ -1,0 +1,86 @@
+service: medivoice-ai-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: dev
+  timeout: 30
+  memorySize: 512
+  
+  environment:
+    AUDIO_BUCKET_NAME: medivoice-audio-storage-dev
+    PDF_BUCKET_NAME: medivoice-pdf-storage-dev
+    CONSULTATIONS_TABLE: medivoice-consultations-dev
+    PROMPTS_TABLE: medivoice-prompts-dev
+    DOCTORS_TABLE: medivoice-doctors-dev
+    BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20240620-v1:0
+    ENVIRONMENT: dev
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - arn:aws:s3:::medivoice-audio-storage-dev/*
+            - arn:aws:s3:::medivoice-audio-storage-dev
+            - arn:aws:s3:::medivoice-pdf-storage-dev/*
+            - arn:aws:s3:::medivoice-pdf-storage-dev
+        
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:*:*:table/medivoice-consultations-dev
+            - arn:aws:dynamodb:*:*:table/medivoice-consultations-dev/index/*
+            - arn:aws:dynamodb:*:*:table/medivoice-prompts-dev
+            - arn:aws:dynamodb:*:*:table/medivoice-prompts-dev/index/*
+            - arn:aws:dynamodb:*:*:table/medivoice-doctors-dev
+            - arn:aws:dynamodb:*:*:table/medivoice-doctors-dev/index/*
+        
+        - Effect: Allow
+          Action:
+            - transcribe:StartTranscriptionJob
+            - transcribe:GetTranscriptionJob
+            - transcribe:ListTranscriptionJobs
+          Resource: "*"
+        
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+            - bedrock:InvokeModelWithResponseStream
+          Resource:
+            - arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0
+
+functions:
+  processAudio:
+    handler: src/functions/processAudio.handler
+    timeout: 30
+    memorySize: 1024
+    events:
+      - http:
+          path: /api/audio/process
+          method: post
+          cors: true
+
+  getHistory:
+    handler: src/functions/getHistory.handler
+    timeout: 30
+    memorySize: 512
+    events:
+      - http:
+          path: /api/history
+          method: get
+          cors: true

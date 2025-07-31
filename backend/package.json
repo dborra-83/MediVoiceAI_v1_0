@@ -44,5 +44,6 @@
     "bedrock"
   ],
   "author": "MediVoice AI Team",
-  "license": "MIT"
-} 
+  "license": "MIT",
+  "type": "commonjs"
+}

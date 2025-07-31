@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "transcribe:StartMedicalTranscriptionJob",
+        "transcribe:GetMedicalTranscriptionJob",
+        "transcribe:ListMedicalTranscriptionJobs",
+        "transcribe:StartTranscriptionJob",
+        "transcribe:GetTranscriptionJob",
+        "transcribe:ListTranscriptionJobs"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}

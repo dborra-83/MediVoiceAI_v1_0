@@ -1,0 +1,10 @@
+{
+  "httpMethod": "OPTIONS",
+  "body": "{}",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "requestContext": {
+    "authorizer": null
+  }
+}

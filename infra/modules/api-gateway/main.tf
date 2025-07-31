@@ -63,9 +63,13 @@ resource "aws_api_gateway_method" "upload_audio" {
   resource_id   = aws_api_gateway_resource.audio.id
   http_method   = "POST"
   authorization = "NONE"
-  # Temporal: Sin autenticación para testing
+  # TODO: Habilitar autenticación cuando Cognito esté configurado
   # authorization = "COGNITO_USER_POOLS"
   # authorizer_id = aws_api_gateway_authorizer.cognito.id
+  
+  request_parameters = {
+    "method.request.header.Access-Control-Allow-Origin" = false
+  }
 }
 
 # Método POST para procesamiento de audio

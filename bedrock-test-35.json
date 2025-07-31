@@ -1,0 +1,10 @@
+{
+  "anthropic_version": "bedrock-2023-05-31",
+  "max_tokens": 100,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, I am testing Claude 3.5 Sonnet. Please respond in Spanish confirming you are Claude 3.5 Sonnet v2."
+    }
+  ]
+}

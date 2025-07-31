@@ -6,14 +6,77 @@ function AudioRecorder() {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [transcription, setTranscription] = useState('')
+  const [transcriptionWithSpeakers, setTranscriptionWithSpeakers] = useState('')
   const [analysis, setAnalysis] = useState('')
+  const [consultationId, setConsultationId] = useState('')
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [recordingTime, setRecordingTime] = useState(0)
+  const [processingStatus, setProcessingStatus] = useState('')
   
   const mediaRecorderRef = useRef(null)
   const streamRef = useRef(null)
   const timerRef = useRef(null)
+
+  // Función para verificar el estado del procesamiento periódicamente
+  const pollForCompletion = async (audioKey, consultationId) => {
+    const maxAttempts = 60 // Máximo 10 minutos (60 intentos * 10 segundos)
+    let attempts = 0
+    
+    while (attempts < maxAttempts) {
+      try {
+        console.log(`🔄 Verificando estado del procesamiento (intento ${attempts + 1}/${maxAttempts})...`)
+        setProcessingStatus(`Verificando transcripción... (${attempts + 1}/${maxAttempts})`)
+        
+        const statusResponse = await axios.post(
+          config.endpoints.processAudio,
+          {
+            audioKey: audioKey,
+            consultationId: consultationId,
+            checkStatus: true
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 15000
+          }
+        )
+        
+        console.log('Estado del procesamiento:', statusResponse.data)
+        
+        if (statusResponse.data.success) {
+          // ¡Completado!
+          setTranscription(statusResponse.data.transcription)
+          setTranscriptionWithSpeakers(statusResponse.data.transcriptionWithSpeakers || statusResponse.data.transcription)
+          setAnalysis(statusResponse.data.aiAnalysis)
+          setProcessing(false)
+          console.log('✅ ¡Procesamiento completado con servicios AWS reales!')
+          return
+        } else if (statusResponse.data.status === 'failed') {
+          throw new Error(statusResponse.data.error || 'Procesamiento falló')
+        }
+        
+        // Aún procesando, esperar y reintentar
+        console.log('⏳ Aún procesando, esperando 10 segundos...')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        attempts++
+        
+      } catch (error) {
+        console.error('Error verificando estado:', error)
+        attempts++
+        
+        if (attempts >= maxAttempts) {
+          throw new Error('Timeout esperando procesamiento')
+        }
+        
+        // Esperar antes del siguiente intento
+        await new Promise(resolve => setTimeout(resolve, 10000))
+      }
+    }
+    
+    throw new Error('Timeout: El procesamiento está tomando más tiempo del esperado')
+  }
 
   const startRecording = async () => {
     try {
@@ -122,29 +185,47 @@ function AudioRecorder() {
       console.log('Audio subido:', uploadResponse.data)
       const audioKey = uploadResponse.data.audioKey
       
-      // 2. Procesar audio con IA REAL (Amazon Transcribe + Bedrock Claude 3)
+      // 2. Procesar audio con IA REAL (Amazon Transcribe + Bedrock Claude 3) - ASÍNCRONO
       console.log('🤖 Procesando con IA real: Amazon Transcribe + Bedrock Claude 3...')
+      setProcessingStatus('Iniciando procesamiento...')
       
       const processResponse = await axios.post(
         config.endpoints.processAudio,
         {
           audioKey: audioKey,
-          doctorId: 'doctor-demo'
+          doctorId: 'doctor-demo',
+          patientId: 'patient-demo',
+          specialty: 'general'
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            // Aquí irían los headers de autenticación Cognito
-          }
+          },
+          timeout: 30000 // Reduced to 30 seconds for initial processing
         }
       )
       
-      console.log('Procesamiento completado:', processResponse.data)
+      console.log('Respuesta inicial de procesamiento:', processResponse.data)
       
-      // Mostrar resultados
-      setTranscription(processResponse.data.transcription)
-      setAnalysis(processResponse.data.analysis)
-      setProcessing(false)
+      if (processResponse.data.success) {
+        // Processing completed immediately
+        setTranscription(processResponse.data.transcription)
+        setTranscriptionWithSpeakers(processResponse.data.transcriptionWithSpeakers || processResponse.data.transcription)
+        setAnalysis(processResponse.data.aiAnalysis)
+        setConsultationId(processResponse.data.consultationId)
+        setProcessing(false)
+        console.log('✅ Procesamiento completado inmediatamente')
+      } else if (processResponse.data.status === 'processing') {
+        // Start polling for completion
+        console.log('⏳ Procesamiento iniciado, esperando transcripción...')
+        setConsultationId(processResponse.data.consultationId)
+        setProcessingStatus('Transcribiendo audio con Amazon Transcribe...')
+        
+        // Poll for completion
+        await pollForCompletion(audioKey, processResponse.data.consultationId)
+      } else {
+        throw new Error(processResponse.data.error || 'Error en procesamiento')
+      }
       
     } catch (error) {
       console.error('Error procesando audio:', error)
@@ -167,35 +248,40 @@ function AudioRecorder() {
     try {
       console.log('📄 Generando PDF con AWS Lambda real...')
       
+      // Usar el consultationId real del procesamiento
       const response = await axios.post(
         config.endpoints.generatePDF,
         {
-          transcription: transcription,
-          analysis: analysis,
+          consultationId: consultationId || `consultation-${Date.now()}`, // Usar el ID real o fallback
           doctorId: 'doctor-demo'
         },
         {
           headers: {
             'Content-Type': 'application/json',
-          },
-          responseType: 'blob'
+          }
         }
       )
       
-      // Descargar PDF real generado por Lambda
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `receta-medica-${Date.now()}.pdf`)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
+      console.log('PDF response:', response.data)
+      
+      if (response.data.downloadUrl) {
+        // Si el PDF está en S3, abrir URL
+        window.open(response.data.downloadUrl, '_blank')
+      } else if (response.data.pdfKey) {
+        // Construir URL de descarga
+        const downloadUrl = `${config.apiUrl}/api/pdf/download?key=${response.data.pdfKey}`
+        window.open(downloadUrl, '_blank')
+      }
       
       console.log('✅ PDF real generado exitosamente con AWS Lambda')
       
     } catch (error) {
       console.error('Error generando PDF:', error)
-      setError('Error generando PDF: ' + error.message)
+      if (error.response?.data?.message) {
+        setError('Error generando PDF: ' + error.response.data.message)
+      } else {
+        setError('Error generando PDF: ' + error.message)
+      }
     }
   }
 
@@ -290,7 +376,7 @@ function AudioRecorder() {
                     {processing ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2"></span>
-                        Procesando con IA...
+                        {processingStatus || 'Procesando con IA...'}
                       </>
                     ) : (
                       <>
@@ -312,13 +398,41 @@ function AudioRecorder() {
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <h5>📝 Resultados del Análisis con IA</h5>
-                <span className="badge bg-success">Claude 3 Sonnet</span>
+                <span className="badge bg-success">Claude 3.5 Sonnet</span>
               </div>
               <div className="card-body">
                 {transcription && (
                   <div className="alert alert-info">
-                    <h6><i className="fas fa-microphone me-2"></i>Transcripción (Amazon Transcribe Medical):</h6>
-                    <p className="mb-0">{transcription}</p>
+                    <h6><i className="fas fa-microphone me-2"></i>Transcripción (Amazon Transcribe):</h6>
+                    {transcriptionWithSpeakers && transcriptionWithSpeakers !== transcription ? (
+                      <div>
+                        <div className="mb-3">
+                          <strong>🎭 Con identificación de hablantes:</strong>
+                          <div className="mt-2 p-3 bg-light rounded" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95em' }}>
+                            {transcriptionWithSpeakers.split('\n').map((line, index) => {
+                              if (line.trim().startsWith('**')) {
+                                // Speaker line
+                                return <div key={index} className="fw-bold text-primary mt-2">{line.replace(/\*\*/g, '')}</div>
+                              } else if (line.trim()) {
+                                // Speech content
+                                return <div key={index} className="ms-3">{line}</div>
+                              }
+                              return <div key={index}></div>
+                            })}
+                          </div>
+                        </div>
+                        <details>
+                          <summary className="text-muted" style={{ cursor: 'pointer' }}>
+                            📄 Ver transcripción completa (sin separación)
+                          </summary>
+                          <div className="mt-2 p-2 bg-light rounded small">
+                            {transcription}
+                          </div>
+                        </details>
+                      </div>
+                    ) : (
+                      <p className="mb-0">{transcription}</p>
+                    )}
                   </div>
                 )}
                 

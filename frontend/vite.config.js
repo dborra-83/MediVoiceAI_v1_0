@@ -7,7 +7,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
   // Default API Gateway URL if not specified
-  const defaultApiUrl = 'https://your-api-id.execute-api.us-east-1.amazonaws.com/dev'
+  const defaultApiUrl = 'https://hfttsqws09.execute-api.us-east-1.amazonaws.com/dev'
   const apiUrl = env.VITE_API_URL || defaultApiUrl
   
   return {

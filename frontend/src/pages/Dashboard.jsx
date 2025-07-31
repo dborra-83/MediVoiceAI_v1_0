@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import config from '../config'
 
 function Dashboard() {
@@ -7,15 +8,54 @@ function Dashboard() {
     todayConsultations: 0,
     pendingReports: 0
   })
+  const [recentConsultations, setRecentConsultations] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Simular carga de estadísticas
-    setStats({
-      totalConsultations: 127,
-      todayConsultations: 8,
-      pendingReports: 3
-    })
+    loadRecentConsultations()
   }, [])
+
+  const loadRecentConsultations = async () => {
+    try {
+      setLoading(true)
+      console.log('🔄 Cargando consultas recientes desde API real...')
+      
+      const response = await axios.get(config.endpoints.getHistory, {
+        params: { limit: 5 } // Solo las 5 más recientes
+      })
+      
+      console.log('✅ Consultas recientes cargadas:', response.data)
+      
+      if (response.data && response.data.consultations) {
+        const consultations = response.data.consultations
+        setRecentConsultations(consultations)
+        
+        // Calcular estadísticas reales
+        const today = new Date().toDateString()
+        const todayCount = consultations.filter(c => 
+          new Date(c.createdAt).toDateString() === today
+        ).length
+        
+        setStats({
+          totalConsultations: response.data.count || consultations.length,
+          todayConsultations: todayCount,
+          pendingReports: consultations.filter(c => c.status === 'processing').length
+        })
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando consultas recientes:', error)
+      // Fallback a datos simulados si falla el API
+      setRecentConsultations([])
+      setStats({
+        totalConsultations: 0,
+        todayConsultations: 0,
+        pendingReports: 0
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="dashboard">
@@ -139,48 +179,86 @@ function Dashboard() {
               <h5>📋 Consultas Recientes</h5>
             </div>
             <div className="card-body">
-              <div className="table-responsive">
-                <table className="table table-striped">
-                  <thead>
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Paciente</th>
-                      <th>Tipo</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>28/07/2024 09:30</td>
-                      <td>Juan Pérez</td>
-                      <td>Consulta General</td>
-                      <td><span className="badge bg-success">Completada</span></td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary">Ver</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>28/07/2024 10:15</td>
-                      <td>María González</td>
-                      <td>Cardiología</td>
-                      <td><span className="badge bg-warning">Procesando</span></td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary">Ver</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>28/07/2024 11:00</td>
-                      <td>Carlos Silva</td>
-                      <td>Consulta General</td>
-                      <td><span className="badge bg-success">Completada</span></td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary">Ver</button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border" role="status">
+                    <span className="visually-hidden">Cargando...</span>
+                  </div>
+                  <p className="mt-2">Cargando consultas recientes...</p>
+                </div>
+              ) : recentConsultations.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
+                  <p className="text-muted">No hay consultas recientes</p>
+                  <a href="/recorder" className="btn btn-primary">
+                    <i className="fas fa-plus me-2"></i>
+                    Nueva Consulta
+                  </a>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Paciente</th>
+                        <th>Especialidad</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentConsultations.slice(0, 5).map((consultation) => (
+                        <tr key={consultation.consultationId}>
+                          <td>
+                            <small>{consultation.formattedDate}</small>
+                          </td>
+                          <td>
+                            <strong>{consultation.patientId}</strong>
+                          </td>
+                          <td>
+                            <span className="badge bg-info">
+                              {consultation.specialty || 'General'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${consultation.status === 'completed' ? 'bg-success' : 'bg-warning'}`}>
+                              {consultation.status === 'completed' ? 'Completada' : 'Procesando'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="btn-group btn-group-sm">
+                              <button 
+                                className="btn btn-outline-primary"
+                                onClick={() => window.location.href = `/history?id=${consultation.consultationId}`}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              {consultation.hasAiAnalysis && (
+                                <button 
+                                  className="btn btn-outline-success"
+                                  title="Generar PDF"
+                                >
+                                  <i className="fas fa-file-pdf"></i>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              
+              {recentConsultations.length > 0 && (
+                <div className="text-center mt-3">
+                  <a href="/history" className="btn btn-outline-primary">
+                    <i className="fas fa-list me-2"></i>
+                    Ver Historial Completo
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import config from '../config'
 
 function History() {
@@ -7,53 +8,43 @@ function History() {
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
-    // Simular carga de historial
-    setTimeout(() => {
-      setConsultations([
-        {
-          id: '1',
-          date: '2024-07-28T09:30:00Z',
-          patient: 'Juan Pérez',
-          type: 'Consulta General',
-          status: 'completed',
-          transcription: 'Paciente presenta dolor abdominal...',
-          aiAnalysis: 'Diagnóstico probable: gastritis...',
-          pdfUrl: null
-        },
-        {
-          id: '2',
-          date: '2024-07-28T10:15:00Z',
-          patient: 'María González',
-          type: 'Cardiología',
-          status: 'processing',
-          transcription: 'Consulta cardiológica de seguimiento...',
-          aiAnalysis: null,
-          pdfUrl: null
-        },
-        {
-          id: '3',
-          date: '2024-07-28T11:00:00Z',
-          patient: 'Carlos Silva',
-          type: 'Consulta General',
-          status: 'completed',
-          transcription: 'Control de hipertensión arterial...',
-          aiAnalysis: 'Seguimiento de tratamiento antihipertensivo...',
-          pdfUrl: 'https://example.com/prescription.pdf'
-        },
-        {
-          id: '4',
-          date: '2024-07-27T14:30:00Z',
-          patient: 'Ana Rodríguez',
-          type: 'Pediatría',
-          status: 'completed',
-          transcription: 'Control de crecimiento y desarrollo...',
-          aiAnalysis: 'Desarrollo normal para la edad...',
-          pdfUrl: 'https://example.com/prescription2.pdf'
-        }
-      ])
-      setLoading(false)
-    }, 1000)
+    loadConsultations()
   }, [])
+
+  const loadConsultations = async () => {
+    try {
+      setLoading(true)
+      console.log('🔄 Cargando historial completo desde API real...')
+      
+      const response = await axios.get(config.endpoints.getHistory)
+      
+      console.log('✅ Historial cargado:', response.data)
+      
+      if (response.data && response.data.consultations) {
+        const consultationsData = response.data.consultations.map(consultation => ({
+          id: consultation.consultationId,
+          date: consultation.createdAt,
+          patient: consultation.patientId || 'Sin identificar',
+          type: consultation.specialty || 'General',
+          status: consultation.status || 'completed',
+          transcription: consultation.summary || 'Sin transcripción disponible',
+          aiAnalysis: consultation.hasAiAnalysis ? consultation.summary : null,
+          pdfUrl: null,
+          hasTranscription: consultation.hasTranscription,
+          hasAiAnalysis: consultation.hasAiAnalysis
+        }))
+        setConsultations(consultationsData)
+      } else {
+        setConsultations([])
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando historial:', error)
+      setConsultations([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredConsultations = consultations.filter(consultation => {
     if (filter === 'all') return true

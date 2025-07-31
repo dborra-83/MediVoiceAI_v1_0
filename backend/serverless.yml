@@ -8,11 +8,11 @@ provider:
   region: ${env:AWS_REGION, 'us-east-1'}
   stage: ${env:STAGE, 'dev'}
   environment:
-    AUDIO_BUCKET_NAME: ${env:AUDIO_BUCKET_NAME, 'medivoice-audio-storage-dev'}
-    PDF_BUCKET_NAME: ${env:PDF_BUCKET_NAME, 'medivoice-pdf-storage-dev'}
-    CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-consultations-dev'}
-    PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-prompts-dev'}
-    DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-doctors-dev'}
+    AUDIO_BUCKET_NAME: ${env:AUDIO_BUCKET_NAME, 'medivoice-ai-dev-audio'}
+    PDF_BUCKET_NAME: ${env:PDF_BUCKET_NAME, 'medivoice-ai-dev-pdfs'}
+    CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}
+    PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}
+    DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
     BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-3-5-sonnet-20240620-v1:0'}
     ENVIRONMENT: ${env:STAGE, 'dev'}
   
@@ -26,10 +26,10 @@ provider:
             - s3:DeleteObject
             - s3:ListBucket
           Resource:
-            - arn:aws:s3:::${env:AUDIO_BUCKET_NAME, 'medivoice-audio-storage-dev'}/*
-            - arn:aws:s3:::${env:AUDIO_BUCKET_NAME, 'medivoice-audio-storage-dev'}
-            - arn:aws:s3:::${env:PDF_BUCKET_NAME, 'medivoice-pdf-storage-dev'}/*
-            - arn:aws:s3:::${env:PDF_BUCKET_NAME, 'medivoice-pdf-storage-dev'}
+            - arn:aws:s3:::${env:AUDIO_BUCKET_NAME, 'medivoice-ai-dev-audio'}/*
+            - arn:aws:s3:::${env:AUDIO_BUCKET_NAME, 'medivoice-ai-dev-audio'}
+            - arn:aws:s3:::${env:PDF_BUCKET_NAME, 'medivoice-ai-dev-pdfs'}/*
+            - arn:aws:s3:::${env:PDF_BUCKET_NAME, 'medivoice-ai-dev-pdfs'}
         
         - Effect: Allow
           Action:
@@ -40,12 +40,12 @@ provider:
             - dynamodb:Query
             - dynamodb:Scan
           Resource:
-            - arn:aws:dynamodb:*:*:table/${env:CONSULTATIONS_TABLE, 'medivoice-consultations-dev'}
-            - arn:aws:dynamodb:*:*:table/${env:CONSULTATIONS_TABLE, 'medivoice-consultations-dev'}/index/*
-            - arn:aws:dynamodb:*:*:table/${env:PROMPTS_TABLE, 'medivoice-prompts-dev'}
-            - arn:aws:dynamodb:*:*:table/${env:PROMPTS_TABLE, 'medivoice-prompts-dev'}/index/*
-            - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-doctors-dev'}
-            - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-doctors-dev'}/index/*
+            - arn:aws:dynamodb:*:*:table/${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}
+            - arn:aws:dynamodb:*:*:table/${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}/index/*
+            - arn:aws:dynamodb:*:*:table/${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}
+            - arn:aws:dynamodb:*:*:table/${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}/index/*
+            - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
+            - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}/index/*
         
         - Effect: Allow
           Action:
@@ -99,11 +99,11 @@ functions:
           #   arn: ${env:COGNITO_USER_POOL_ARN}
     
     environment:
-      AUDIO_BUCKET_NAME: ${env:AUDIO_BUCKET_NAME, 'medivoice-audio-storage-dev'}
-      PDF_BUCKET_NAME: ${env:PDF_BUCKET_NAME, 'medivoice-pdf-storage-dev'}
-      CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-consultations-dev'}
-      PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-prompts-dev'}
-      DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-doctors-dev'}
+      AUDIO_BUCKET_NAME: ${env:AUDIO_BUCKET_NAME, 'medivoice-ai-dev-audio'}
+      PDF_BUCKET_NAME: ${env:PDF_BUCKET_NAME, 'medivoice-ai-dev-pdfs'}
+      CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}
+      PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}
+      DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
       BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-3-5-sonnet-20240620-v1:0'}
     
     timeout: 30

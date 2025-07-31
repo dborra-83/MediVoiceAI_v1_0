@@ -12,12 +12,14 @@
 
 ### ✨ Características Principales
 
+- 👤 **Formulario de Paciente** - Captura completa de datos médicos antes de la grabación
 - 🎤 **Grabación de Audio Médico** - Captura consultas médicas con límite de 3 minutos
-- 🎭 **Separación de Hablantes** - Identifica automáticamente Doctor, Paciente, Acompañante, Familiar
-- 🔊 **Transcripción Automática** - Amazon Transcribe en español con identificación de hablantes
-- 🧠 **Análisis con IA** - Claude 3.5 Sonnet para generar análisis médicos detallados
+- 🎭 **Separación Inteligente de Hablantes** - Identifica automáticamente Doctor vs Paciente (optimizado para 2 hablantes)
+- 🧠 **Algoritmo Heurístico** - Análisis de terminología médica para identificación precisa de roles
+- 🔊 **Transcripción Automática** - Amazon Transcribe en español con identificación optimizada
+- 🤖 **Análisis con IA** - Claude 3.5 Sonnet para generar análisis médicos detallados
 - 📄 **Generación de Recetas PDF** - Recetas médicas profesionales automáticas
-- 📋 **Historial Real** - Base de datos DynamoDB con consultas reales (no mock data)
+- 📋 **Historial con Nombres Reales** - Base de datos DynamoDB con nombres de pacientes
 - 💾 **Guardado Manual** - Función para guardar consultas al historial
 - ⚡ **Procesamiento Asíncrono** - Manejo de archivos largos con polling automático
 - ☁️ **Arquitectura Serverless** - Escalabilidad automática y costos optimizados

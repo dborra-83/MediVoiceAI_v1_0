@@ -82,7 +82,7 @@ exports.handler = async (event) => {
         };
       }
 
-      const { audioKey, patientId, doctorId, specialty = 'general', checkStatus = false, consultationId: existingId, saveOnly = false, transcription, transcriptionWithSpeakers, aiAnalysis } = body;
+      const { audioKey, patientId, doctorId, specialty = 'general', checkStatus = false, consultationId: existingId, saveOnly = false, transcription, transcriptionWithSpeakers, aiAnalysis, patientName } = body;
 
       if (!audioKey && !saveOnly) {
         return {
@@ -118,6 +118,7 @@ exports.handler = async (event) => {
               consultation_id: consultationId,
               doctor_id: currentDoctorId,
               patient_id: currentPatientId,
+              patient_name: patientName || currentPatientId,
               audio_key: audioKey || `manual-save-${Date.now()}`,
               transcription: transcription,
               transcription_with_speakers: transcriptionWithSpeakers || transcription,
@@ -236,24 +237,31 @@ exports.handler = async (event) => {
                   console.log(`Segment ${speakerLabel} text: "${segmentText}"`);
                   
                   if (segmentText && currentSpeaker !== speakerLabel) {
-                    // New speaker - intelligent mapping
+                    // New speaker - intelligent mapping optimizado para consultas médicas
                     let speakerName;
+                    
+                    // Análisis heurístico para identificar doctor vs paciente
+                    const medicalTerms = ['diagnóstico', 'tratamiento', 'medicamento', 'prescribir', 'síntomas', 'examen', 'receta', 'dosis'];
+                    const patientTerms = ['dolor', 'siento', 'me duele', 'molestia', 'desde hace', 'me pasa', 'tengo'];
+                    
+                    const segmentLower = segmentText.toLowerCase();
+                    const hasMedicalTerms = medicalTerms.some(term => segmentLower.includes(term));
+                    const hasPatientTerms = patientTerms.some(term => segmentLower.includes(term));
+                    
                     switch(speakerLabel) {
                       case 'spk_0':
-                        speakerName = 'Doctor';
+                        // Primer hablante - generalmente doctor (quien inicia la consulta)
+                        speakerName = hasMedicalTerms || !hasPatientTerms ? 'Doctor' : 'Paciente';
                         break;
                       case 'spk_1':
-                        speakerName = 'Paciente';
-                        break;
-                      case 'spk_2':
-                        speakerName = 'Acompañante';
-                        break;
-                      case 'spk_3':
-                        speakerName = 'Familiar';
+                        // Segundo hablante - generalmente paciente
+                        speakerName = hasPatientTerms || !hasMedicalTerms ? 'Paciente' : 'Doctor';
                         break;
                       default:
+                        // Fallback para casos excepcionales
                         speakerName = `Hablante ${speakerLabel.replace('spk_', '')}`;
                     }
+                    
                     speakerTranscription += `\n\n**${speakerName}:** `;
                     currentSpeaker = speakerLabel;
                   }
@@ -328,6 +336,7 @@ Transcripción a analizar: ${transcriptionText}`;
                   consultation_id: consultationId,
                   doctor_id: currentDoctorId,
                   patient_id: currentPatientId,
+                  patient_name: patientName || currentPatientId,
                   audio_key: audioKey,
                   transcription: transcriptionText,
                   transcription_with_speakers: speakerTranscription,
@@ -456,8 +465,10 @@ Transcripción a analizar: ${transcriptionText}`;
           OutputKey: `transcriptions/${consultationId}.json`,
           Settings: {
             ShowSpeakerLabels: true,
-            MaxSpeakerLabels: 4,  // Allow up to 4 speakers (doctor, patient, family, etc.)
-            ChannelIdentification: false
+            MaxSpeakerLabels: 2,  // Optimizado para doctor y paciente únicamente
+            ChannelIdentification: false,
+            VocabularyName: undefined, // Podemos agregar vocabulario médico personalizado
+            VocabularyFilterName: undefined
           }
         });
 

@@ -16,31 +16,40 @@
 ## 🎯 REQUERIMIENTOS FUNCIONALES
 
 ### Core Features - OBLIGATORIOS
-1. **Grabación de Audio**
+1. **Formulario de Datos del Paciente**
+   - Captura obligatoria antes de la grabación
+   - Campos: Nombre (obligatorio), ID/Documento, Edad, Género
+   - Especialidad médica (10 opciones disponibles)
+   - Tipo de consulta y notas adicionales
+   - Validación de datos antes de proceder
+
+2. **Grabación de Audio**
    - Grabación directa desde navegador (WebRTC)
    - Soporte para archivos de audio (.wav, .mp3, .webm)
    - Límite máximo: 10MB por archivo
    - Duración máxima: 3 minutos por grabación
 
-2. **Transcripción con Separación de Hablantes**
+3. **Transcripción Inteligente con Separación de Hablantes**
    - Transcripción automática en español (es-ES)
-   - Separación automática de hasta 4 hablantes
-   - Etiquetado inteligente: Doctor, Paciente, Acompañante, Familiar
+   - Separación optimizada para MÁXIMO 2 hablantes (Doctor/Paciente)
+   - Algoritmo heurístico de identificación basado en terminología médica
+   - Etiquetado inteligente: Doctor vs Paciente automático
    - Formato de salida estructurado con timestamps
 
-3. **Análisis Clínico con IA**
+4. **Análisis Clínico con IA**
    - Análisis automático de la transcripción
    - Generación de: Resumen clínico, Impresión diagnóstica, Plan terapéutico, Observaciones
    - Uso exclusivo de Claude 3.5 Sonnet
    - Formato médico profesional
 
-4. **Gestión de Historial**
-   - Almacenamiento seguro de consultas
+5. **Gestión de Historial con Nombres Reales**
+   - Almacenamiento seguro de consultas con nombre del paciente
    - Búsqueda por doctor, paciente, especialidad, fecha
-   - Visualización de resúmenes
+   - Visualización de nombres reales (no solo IDs)
    - Acceso a transcripciones completas
+   - Integración completa entre formulario y base de datos
 
-5. **Exportación PDF**
+6. **Exportación PDF**
    - Generación de reportes médicos en PDF
    - Formato profesional con header/footer
    - Incluye transcripción y análisis completo
@@ -257,6 +266,7 @@ Partition Key: consultation_id (String)
 Atributos:
   - doctor_id: String
   - patient_id: String
+  - patient_name: String  # NUEVO - Nombre real del paciente
   - audio_key: String
   - transcription: String
   - transcription_with_speakers: String
@@ -271,20 +281,29 @@ Atributos:
 
 ## 💡 EJEMPLOS DE USO
 
-### 1. Flujo Básico de Usuario
+### 1. Flujo Completo de Usuario (ACTUALIZADO)
 ```
 1. Usuario abre aplicación
-2. Hace clic en "Grabar Audio"
-3. Habla durante consulta médica
-4. Detiene grabación
-5. Sistema procesa automáticamente:
+2. Completa formulario de datos del paciente:
+   - Nombre del paciente (obligatorio)
+   - ID/Documento, edad, género
+   - Especialidad médica
+   - Tipo de consulta y notas
+3. Hace clic en "Continuar a Grabación"
+4. Ve información del paciente en barra superior
+5. Hace clic en "Grabar Audio"
+6. Habla durante consulta médica (máximo 2 hablantes)
+7. Detiene grabación
+8. Sistema procesa automáticamente:
    - Sube audio a S3
-   - Inicia transcripción con Transcribe
+   - Inicia transcripción optimizada (2 hablantes)
+   - Aplica algoritmo heurístico de identificación
    - Procesa con Claude 3.5 para análisis
-   - Guarda en DynamoDB
-6. Usuario ve transcripción con hablantes separados
-7. Usuario ve análisis médico estructurado
-8. Usuario puede exportar PDF
+   - Guarda en DynamoDB con nombre del paciente
+9. Usuario ve transcripción con Doctor/Paciente separados
+10. Usuario ve análisis médico estructurado
+11. Usuario puede exportar PDF
+12. Historial muestra nombres reales de pacientes
 ```
 
 ### 2. Formato de Transcripción Esperado
@@ -298,7 +317,53 @@ Atributos:
 **Paciente:** Comenzó hace tres días, es como una presión que viene y va.
 ```
 
-### 3. Formato de Análisis de IA
+### 3. Algoritmo Heurístico de Identificación de Hablantes
+```javascript
+// Implementación obligatoria en processAudio.js
+const medicalTerms = [
+  'diagnóstico', 'tratamiento', 'medicamento', 'prescribir', 
+  'síntomas', 'examen', 'receta', 'dosis'
+];
+const patientTerms = [
+  'dolor', 'siento', 'me duele', 'molestia', 
+  'desde hace', 'me pasa', 'tengo'
+];
+
+// Lógica de identificación
+const segmentLower = segmentText.toLowerCase();
+const hasMedicalTerms = medicalTerms.some(term => segmentLower.includes(term));
+const hasPatientTerms = patientTerms.some(term => segmentLower.includes(term));
+
+switch(speakerLabel) {
+  case 'spk_0':
+    // Primer hablante - generalmente doctor
+    speakerName = hasMedicalTerms || !hasPatientTerms ? 'Doctor' : 'Paciente';
+    break;
+  case 'spk_1':
+    // Segundo hablante - generalmente paciente
+    speakerName = hasPatientTerms || !hasMedicalTerms ? 'Paciente' : 'Doctor';
+    break;
+}
+```
+
+### 4. Configuración Optimizada de Amazon Transcribe
+```javascript
+// Configuración OBLIGATORIA para consultas médicas
+const transcribeCommand = new StartTranscriptionJobCommand({
+  TranscriptionJobName: jobName,
+  LanguageCode: 'es-ES',
+  Media: { MediaFileUri: s3Uri },
+  Settings: {
+    ShowSpeakerLabels: true,
+    MaxSpeakerLabels: 2,  // MÁXIMO 2 hablantes para precisión
+    ChannelIdentification: false,
+    VocabularyName: undefined, // Vocabulario médico personalizado opcional
+    VocabularyFilterName: undefined
+  }
+});
+```
+
+### 5. Formato de Análisis de IA
 ```
 ## RESUMEN CLÍNICO
 - Motivo de consulta: Dolor torácico de 3 días de evolución

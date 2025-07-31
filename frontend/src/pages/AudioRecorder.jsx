@@ -3,6 +3,19 @@ import axios from 'axios'
 import config from '../config'
 
 function AudioRecorder() {
+  // Estados del formulario pre-grabación
+  const [showPatientForm, setShowPatientForm] = useState(true)
+  const [patientData, setPatientData] = useState({
+    patientName: '',
+    patientId: '',
+    age: '',
+    gender: '',
+    specialty: 'general',
+    consultationType: 'consulta',
+    notes: ''
+  })
+  
+  // Estados de grabación y procesamiento
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [transcription, setTranscription] = useState('')
@@ -194,8 +207,9 @@ function AudioRecorder() {
         {
           audioKey: audioKey,
           doctorId: 'doctor-demo',
-          patientId: 'patient-demo',
-          specialty: 'general'
+          patientId: patientData.patientId || patientData.patientName,
+          patientName: patientData.patientName,
+          specialty: patientData.specialty
         },
         {
           headers: {
@@ -313,8 +327,9 @@ function AudioRecorder() {
             transcriptionWithSpeakers: transcriptionWithSpeakers,
             aiAnalysis: analysis,
             doctorId: 'doctor-demo',
-            patientId: 'patient-demo',
-            specialty: 'general',
+            patientId: patientData.patientId || patientData.patientName,
+            patientName: patientData.patientName,
+            specialty: patientData.specialty,
             saveOnly: true
           },
           {
@@ -333,6 +348,33 @@ function AudioRecorder() {
       console.error('Error guardando en historial:', error)
       setError('Error guardando en historial: ' + error.message)
     }
+  }
+
+  // Función para manejar cambios en el formulario del paciente
+  const handlePatientDataChange = (field, value) => {
+    setPatientData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  // Función para validar y proceder con la grabación
+  const startConsultation = () => {
+    if (!patientData.patientName.trim()) {
+      setError('Por favor ingresa el nombre del paciente')
+      return
+    }
+    
+    // Generar ID único si no existe
+    if (!patientData.patientId.trim()) {
+      setPatientData(prev => ({
+        ...prev,
+        patientId: `PAT-${Date.now()}`
+      }))
+    }
+    
+    setShowPatientForm(false)
+    setError('')
   }
 
   const formatTime = (seconds) => {
@@ -368,9 +410,194 @@ function AudioRecorder() {
         </div>
       )}
 
-      <div className="row">
-        <div className="col-md-8 mx-auto">
-          <div className="card">
+      {/* Formulario de datos del paciente */}
+      {showPatientForm && (
+        <div className="row mb-4">
+          <div className="col-md-8 mx-auto">
+            <div className="card">
+              <div className="card-header">
+                <h5>👤 Información del Paciente</h5>
+                <small className="text-muted">Complete los datos antes de iniciar la grabación</small>
+              </div>
+              <div className="card-body">
+                <div className="row mb-3">
+                  <div className="col-md-8">
+                    <label className="form-label">Nombre del Paciente *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={patientData.patientName}
+                      onChange={(e) => handlePatientDataChange('patientName', e.target.value)}
+                      placeholder="Ej: Juan Pérez"
+                      required
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">ID/Documento</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={patientData.patientId}
+                      onChange={(e) => handlePatientDataChange('patientId', e.target.value)}
+                      placeholder="Ej: 12345678"
+                    />
+                  </div>
+                </div>
+                
+                <div className="row mb-3">
+                  <div className="col-md-4">
+                    <label className="form-label">Edad</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={patientData.age}
+                      onChange={(e) => handlePatientDataChange('age', e.target.value)}
+                      placeholder="Ej: 35"
+                      min="0"
+                      max="120"
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Género</label>
+                    <select
+                      className="form-select"
+                      value={patientData.gender}
+                      onChange={(e) => handlePatientDataChange('gender', e.target.value)}
+                    >
+                      <option value="">Seleccionar</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="femenino">Femenino</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Especialidad</label>
+                    <select
+                      className="form-select"
+                      value={patientData.specialty}
+                      onChange={(e) => handlePatientDataChange('specialty', e.target.value)}
+                    >
+                      <option value="general">Medicina General</option>
+                      <option value="cardiologia">Cardiología</option>
+                      <option value="pediatria">Pediatría</option>
+                      <option value="neurologia">Neurología</option>
+                      <option value="dermatologia">Dermatología</option>
+                      <option value="ginecologia">Ginecología</option>
+                      <option value="traumatologia">Traumatología</option>
+                      <option value="psiquiatria">Psiquiatría</option>
+                      <option value="oftalmologia">Oftalmología</option>
+                      <option value="otorrinolaringologia">Otorrinolaringología</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Tipo de Consulta</label>
+                    <select
+                      className="form-select"
+                      value={patientData.consultationType}
+                      onChange={(e) => handlePatientDataChange('consultationType', e.target.value)}
+                    >
+                      <option value="consulta">Consulta</option>
+                      <option value="control">Control</option>
+                      <option value="emergencia">Emergencia</option>
+                      <option value="seguimiento">Seguimiento</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Notas Adicionales</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={patientData.notes}
+                    onChange={(e) => handlePatientDataChange('notes', e.target.value)}
+                    placeholder="Motivo de consulta, síntomas previos, alergias conocidas..."
+                  />
+                </div>
+
+                <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={startConsultation}
+                  >
+                    <i className="fas fa-arrow-right me-2"></i>
+                    Continuar a Grabación
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interfaz de grabación - solo se muestra después del formulario */}
+      {!showPatientForm && (
+        <>
+          {/* Información del paciente - barra superior */}
+          <div className="row mb-3">
+            <div className="col-12">
+              <div className="card border-primary">
+                <div className="card-body py-2">
+                  <div className="row align-items-center">
+                    <div className="col-md-3">
+                      <strong>👤 {patientData.patientName}</strong>
+                      {patientData.patientId && (
+                        <small className="text-muted d-block">ID: {patientData.patientId}</small>
+                      )}
+                    </div>
+                    <div className="col-md-2">
+                      {patientData.age && (
+                        <small>
+                          <strong>Edad:</strong> {patientData.age} años
+                        </small>
+                      )}
+                    </div>
+                    <div className="col-md-2">
+                      {patientData.gender && (
+                        <small>
+                          <strong>Género:</strong> {patientData.gender}
+                        </small>
+                      )}
+                    </div>
+                    <div className="col-md-3">
+                      <span className="badge bg-primary">
+                        {patientData.specialty.charAt(0).toUpperCase() + patientData.specialty.slice(1)}
+                      </span>
+                      <span className="badge bg-secondary ms-1">
+                        {patientData.consultationType.charAt(0).toUpperCase() + patientData.consultationType.slice(1)}
+                      </span>
+                    </div>
+                    <div className="col-md-2 text-end">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setShowPatientForm(true)}
+                        disabled={isRecording || processing}
+                      >
+                        <i className="fas fa-edit"></i> Editar
+                      </button>
+                    </div>
+                  </div>
+                  {patientData.notes && (
+                    <div className="row mt-2">
+                      <div className="col-12">
+                        <small className="text-muted">
+                          <strong>Notas:</strong> {patientData.notes}
+                        </small>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-md-8 mx-auto">
+              <div className="card">
             <div className="card-body text-center">
               <div className="mb-4">
                 {!isRecording ? (
@@ -567,6 +794,8 @@ function AudioRecorder() {
           }
         }
       `}</style>
+        </>
+      )}
     </div>
   )
 }

@@ -214,7 +214,10 @@ function Dashboard() {
                             <small>{consultation.formattedDate}</small>
                           </td>
                           <td>
-                            <strong>{consultation.patientId}</strong>
+                            <strong>{consultation.patientName || consultation.patientId}</strong>
+                            {consultation.patientName && consultation.patientId !== consultation.patientName && (
+                              <small className="text-muted d-block">ID: {consultation.patientId}</small>
+                            )}
                           </td>
                           <td>
                             <span className="badge bg-info">

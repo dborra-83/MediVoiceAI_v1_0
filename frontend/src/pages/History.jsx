@@ -24,7 +24,8 @@ function History() {
         const consultationsData = response.data.consultations.map(consultation => ({
           id: consultation.consultationId,
           date: consultation.createdAt,
-          patient: consultation.patientId || 'Sin identificar',
+          patient: consultation.patientName || consultation.patientId || 'Sin identificar',
+          patientId: consultation.patientId,
           type: consultation.specialty || 'General',
           status: consultation.status || 'completed',
           transcription: consultation.summary || 'Sin transcripción disponible',
@@ -200,6 +201,9 @@ function History() {
                           </td>
                           <td>
                             <strong>{consultation.patient}</strong>
+                            {consultation.patientId && consultation.patientId !== consultation.patient && (
+                              <small className="text-muted d-block">ID: {consultation.patientId}</small>
+                            )}
                           </td>
                           <td>
                             <span className="badge bg-info">{consultation.type}</span>

@@ -4,8 +4,6 @@ const { v4: uuidv4 } = require('uuid')
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
 
 exports.handler = async (event) => {
-  console.log('=== UPLOAD AUDIO TO S3 ===')
-  console.log('Event:', JSON.stringify(event, null, 2))
 
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -25,7 +23,6 @@ exports.handler = async (event) => {
 
     // Handle POST request
     if (event.httpMethod === 'POST') {
-      console.log('Handling POST request for uploadAudio')
       
       // Parse request body
       let body
@@ -43,7 +40,7 @@ exports.handler = async (event) => {
         }
       }
 
-      const { audioData, fileName, contentType, doctorId } = body
+      const { audioData, fileName, contentType, doctorId, patientId, patientName } = body
 
       // Validate required fields
       if (!audioData) {
@@ -86,7 +83,6 @@ exports.handler = async (event) => {
       const audioKey = `audio/${currentDoctorId}/${Date.now()}-${uuidv4()}.${fileExtension}`
       const timestamp = new Date().toISOString()
 
-      console.log(`Uploading to S3: ${audioKey}`)
 
       // Upload to S3
       const uploadParams = {
@@ -98,14 +94,15 @@ exports.handler = async (event) => {
           'doctor-id': currentDoctorId,
           'user-id': userId,
           'uploaded-at': timestamp,
-          'original-filename': fileName || 'recording.webm'
+          'original-filename': fileName || 'recording.webm',
+          'patient-id': patientId || 'unknown',
+          'patient-name': patientName || 'unknown'
         },
         ServerSideEncryption: 'AES256'
       }
 
       const uploadResult = await s3Client.send(new PutObjectCommand(uploadParams))
       
-      console.log('Upload successful:', uploadResult)
 
       return {
         statusCode: 200,
@@ -120,6 +117,8 @@ exports.handler = async (event) => {
           size: audioBuffer.length,
           uploadedAt: timestamp,
           doctorId: currentDoctorId,
+          patientId: patientId,
+          patientName: patientName,
           s3ETag: uploadResult.ETag,
           services: {
             storage: "Amazon S3"

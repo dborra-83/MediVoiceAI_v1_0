@@ -49,8 +49,6 @@ exports.handler = async (event) => {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
   };
 
-  console.log('=== OPTIMIZED PROCESS AUDIO WITH REAL AWS SERVICES ===');
-  console.log('httpMethod:', event.httpMethod);
 
   try {
     // Handle OPTIONS preflight request
@@ -64,7 +62,6 @@ exports.handler = async (event) => {
 
     // Handle POST request
     if (event.httpMethod === 'POST') {
-      console.log('Processing audio with REAL AWS services - OPTIMIZED approach');
       
       // Parse request body
       let body;
@@ -101,24 +98,22 @@ exports.handler = async (event) => {
       const user = event.requestContext?.authorizer?.claims;
       const userId = user?.sub || 'anonymous';
       const currentDoctorId = doctorId || userId;
-      const currentPatientId = patientId || `patient-${Date.now()}`;
+      const currentPatientId = patientId || patientName || `patient-${Date.now()}`;
       
       const consultationId = existingId || generateUUID();
       const timestamp = new Date().toISOString();
 
-      console.log(`Processing audio OPTIMIZED: ${audioKey}`);
 
       try {
         // Handle save-only request (manual save to history)
         if (saveOnly && transcription && aiAnalysis) {
-          console.log('💾 Processing saveOnly request - saving to DynamoDB...');
           
           if (process.env.CONSULTATIONS_TABLE) {
             const consultationData = {
               consultation_id: consultationId,
               doctor_id: currentDoctorId,
               patient_id: currentPatientId,
-              patient_name: patientName || currentPatientId,
+              patient_name: patientName || 'Sin nombre',
               audio_key: audioKey || `manual-save-${Date.now()}`,
               transcription: transcription,
               transcription_with_speakers: transcriptionWithSpeakers || transcription,
@@ -135,7 +130,6 @@ exports.handler = async (event) => {
             });
 
             await docClient.send(putCommand);
-            console.log('✅ Manual consultation saved to DynamoDB:', consultationId);
             
             return {
               statusCode: 200,
@@ -168,7 +162,6 @@ exports.handler = async (event) => {
             // Get transcription results and process with Bedrock
             try {
               const transcriptionKey = `transcriptions/${existingId}.json`;
-              console.log('Getting REAL transcription from S3:', transcriptionKey);
               
               const getObjectCommand = new GetObjectCommand({
                 Bucket: process.env.AUDIO_BUCKET_NAME,
@@ -187,8 +180,6 @@ exports.handler = async (event) => {
               let currentSpeaker = null;
               
               if (transcriptionData.results.speaker_labels && transcriptionData.results.speaker_labels.segments) {
-                console.log('Processing speaker segments...');
-                console.log('Segments found:', transcriptionData.results.speaker_labels.segments.length);
                 
                 // Build a map of word timestamps to items
                 const wordMap = new Map();
@@ -209,7 +200,6 @@ exports.handler = async (event) => {
                   const startTime = parseFloat(segment.start_time);
                   const endTime = parseFloat(segment.end_time);
                   
-                  console.log(`Processing segment: ${speakerLabel} from ${startTime} to ${endTime}`);
                   
                   // Get words within this time segment
                   const segmentWords = [];
@@ -234,7 +224,6 @@ exports.handler = async (event) => {
                   }
                   
                   const segmentText = segmentWords.join(' ').trim();
-                  console.log(`Segment ${speakerLabel} text: "${segmentText}"`);
                   
                   if (segmentText && currentSpeaker !== speakerLabel) {
                     // New speaker - intelligent mapping optimizado para consultas médicas
@@ -271,15 +260,11 @@ exports.handler = async (event) => {
                   }
                 }
               } else {
-                console.log('No speaker labels found, using full transcript');
                 speakerTranscription = transcriptionText;
               }
 
-              console.log('✅ REAL Transcription completed:', transcriptionText.substring(0, 100) + '...');
-              console.log('Speaker separation processed');
 
               // Process with REAL Amazon Bedrock (Claude 3.5 Sonnet)
-              console.log('Analyzing with REAL Amazon Bedrock Claude 3.5 Sonnet...');
               
               const medicalPrompt = `Como médico especialista, analiza la siguiente transcripción de una consulta médica y proporciona:
 
@@ -328,7 +313,6 @@ Transcripción a analizar: ${transcriptionText}`;
               const aiAnalysisResult = JSON.parse(new TextDecoder().decode(bedrockAnalysisResponse.body));
               const aiAnalysis = aiAnalysisResult.content[0].text;
 
-              console.log('✅ REAL AI analysis completed');
 
               // Save consultation to REAL DynamoDB
               if (process.env.CONSULTATIONS_TABLE) {
@@ -336,7 +320,7 @@ Transcripción a analizar: ${transcriptionText}`;
                   consultation_id: consultationId,
                   doctor_id: currentDoctorId,
                   patient_id: currentPatientId,
-                  patient_name: patientName || currentPatientId,
+                  patient_name: patientName || 'Sin nombre',
                   audio_key: audioKey,
                   transcription: transcriptionText,
                   transcription_with_speakers: speakerTranscription,
@@ -353,7 +337,6 @@ Transcripción a analizar: ${transcriptionText}`;
                 });
 
                 await docClient.send(putCommand);
-                console.log('✅ Consultation saved to REAL DynamoDB:', consultationId);
               }
 
               return {
@@ -436,15 +419,13 @@ Transcripción a analizar: ${transcriptionText}`;
         }
 
         // Initial processing - start transcription job
-        console.log('Starting REAL AWS services...');
         
         // Test S3 first
         try {
           const headCommand = new HeadBucketCommand({ Bucket: process.env.AUDIO_BUCKET_NAME });
           await s3Client.send(headCommand);
-          console.log('✅ REAL S3 bucket accessible');
         } catch (s3Error) {
-          console.log('❌ REAL S3 bucket not accessible:', s3Error.message);
+          console.error('S3 bucket not accessible:', s3Error.message);
           throw new Error(`S3 bucket error: ${s3Error.message}`);
         }
 
@@ -452,8 +433,6 @@ Transcripción a analizar: ${transcriptionText}`;
         const jobName = `transcription-${consultationId}`;
         const s3Uri = `s3://${process.env.AUDIO_BUCKET_NAME}/${audioKey}`;
 
-        console.log('Starting REAL Transcribe job:', jobName);
-        console.log('S3 URI:', s3Uri);
 
         const transcribeCommand = new StartTranscriptionJobCommand({
           TranscriptionJobName: jobName,
@@ -473,7 +452,6 @@ Transcripción a analizar: ${transcriptionText}`;
         });
 
         await transcribeClient.send(transcribeCommand);
-        console.log('✅ REAL Transcription job started successfully');
 
         // Return immediately with processing status
         return {

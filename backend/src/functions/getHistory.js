@@ -174,7 +174,10 @@ exports.handler = async (event) => {
           summary: extractSummary(item.ai_analysis),
           hasTranscription: !!item.transcription,
           hasAiAnalysis: !!item.ai_analysis,
-          audioKey: item.audio_key
+          audioKey: item.audio_key,
+          transcription: item.transcription,
+          transcriptionWithSpeakers: item.transcription_with_speakers,
+          aiAnalysis: item.ai_analysis
         })),
         count: items.length,
         lastEvaluatedKey: response.LastEvaluatedKey ? 
@@ -220,7 +223,10 @@ exports.handler = async (event) => {
           summary: extractSummary(item.ai_analysis),
           hasTranscription: !!item.transcription,
           hasAiAnalysis: !!item.ai_analysis,
-          audioKey: item.audio_key
+          audioKey: item.audio_key,
+          transcription: item.transcription,
+          transcriptionWithSpeakers: item.transcription_with_speakers,
+          aiAnalysis: item.ai_analysis
         })),
         count: items.length,
         lastEvaluatedKey: response.LastEvaluatedKey ? 
@@ -288,7 +294,10 @@ exports.handler = async (event) => {
           summary: extractSummary(item.ai_analysis),
           hasTranscription: !!item.transcription,
           hasAiAnalysis: !!item.ai_analysis,
-          audioKey: item.audio_key
+          audioKey: item.audio_key,
+          transcription: item.transcription,
+          transcriptionWithSpeakers: item.transcription_with_speakers,
+          aiAnalysis: item.ai_analysis
         })),
         count: items.length,
         lastEvaluatedKey: response.LastEvaluatedKey ? 

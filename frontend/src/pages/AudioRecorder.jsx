@@ -38,7 +38,7 @@ function AudioRecorder() {
     
     while (attempts < maxAttempts) {
       try {
-        console.log(`🔄 Verificando estado del procesamiento (intento ${attempts + 1}/${maxAttempts})...`)
+        // Verificando estado del procesamiento
         setProcessingStatus(`Verificando transcripción... (${attempts + 1}/${maxAttempts})`)
         
         const statusResponse = await axios.post(
@@ -56,7 +56,6 @@ function AudioRecorder() {
           }
         )
         
-        console.log('Estado del procesamiento:', statusResponse.data)
         
         if (statusResponse.data.success) {
           // ¡Completado!
@@ -64,14 +63,12 @@ function AudioRecorder() {
           setTranscriptionWithSpeakers(statusResponse.data.transcriptionWithSpeakers || statusResponse.data.transcription)
           setAnalysis(statusResponse.data.aiAnalysis)
           setProcessing(false)
-          console.log('✅ ¡Procesamiento completado con servicios AWS reales!')
           return
         } else if (statusResponse.data.status === 'failed') {
           throw new Error(statusResponse.data.error || 'Procesamiento falló')
         }
         
         // Aún procesando, esperar y reintentar
-        console.log('⏳ Aún procesando, esperando 10 segundos...')
         await new Promise(resolve => setTimeout(resolve, 10000))
         attempts++
         
@@ -138,7 +135,6 @@ function AudioRecorder() {
         setRecordingTime(prev => prev + 1)
       }, 1000)
       
-      console.log('Grabación iniciada...')
       
     } catch (error) {
       console.error('Error accediendo al micrófono:', error)
@@ -157,7 +153,6 @@ function AudioRecorder() {
         timerRef.current = null
       }
       
-      console.log('Grabación detenida...')
     }
   }
 
@@ -168,8 +163,6 @@ function AudioRecorder() {
     setError('')
     
     try {
-      console.log('🌐 CONECTANDO CON AWS REAL - IA VERDADERA...')
-      console.log('Enviando audio a:', config.apiUrl)
       
       // Convertir audio blob a base64 para enviar como JSON
       const reader = new FileReader()
@@ -178,14 +171,17 @@ function AudioRecorder() {
         reader.readAsDataURL(audioBlob)
       })
       
-      // 1. Subir audio a S3 REAL (usando proxy)
+      // 1. Subir audio a S3
+      
       const uploadResponse = await axios.post(
         config.endpoints.uploadAudio, 
         {
           audioData: audioBase64,
           fileName: 'recording.webm',
           contentType: 'audio/webm',
-          doctorId: 'doctor-demo'
+          doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
+          patientId: patientData.patientId || patientData.patientName,
+          patientName: patientData.patientName
         },
         {
           headers: {
@@ -195,18 +191,17 @@ function AudioRecorder() {
         }
       )
       
-      console.log('Audio subido:', uploadResponse.data)
       const audioKey = uploadResponse.data.audioKey
       
       // 2. Procesar audio con IA REAL (Amazon Transcribe + Bedrock Claude 3) - ASÍNCRONO
-      console.log('🤖 Procesando con IA real: Amazon Transcribe + Bedrock Claude 3...')
       setProcessingStatus('Iniciando procesamiento...')
+      
       
       const processResponse = await axios.post(
         config.endpoints.processAudio,
         {
           audioKey: audioKey,
-          doctorId: 'doctor-demo',
+          doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
           patientId: patientData.patientId || patientData.patientName,
           patientName: patientData.patientName,
           specialty: patientData.specialty
@@ -219,7 +214,6 @@ function AudioRecorder() {
         }
       )
       
-      console.log('Respuesta inicial de procesamiento:', processResponse.data)
       
       if (processResponse.data.success) {
         // Processing completed immediately
@@ -228,10 +222,8 @@ function AudioRecorder() {
         setAnalysis(processResponse.data.aiAnalysis)
         setConsultationId(processResponse.data.consultationId)
         setProcessing(false)
-        console.log('✅ Procesamiento completado inmediatamente')
       } else if (processResponse.data.status === 'processing') {
         // Start polling for completion
-        console.log('⏳ Procesamiento iniciado, esperando transcripción...')
         setConsultationId(processResponse.data.consultationId)
         setProcessingStatus('Transcribiendo audio con Amazon Transcribe...')
         
@@ -260,7 +252,6 @@ function AudioRecorder() {
     if (!transcription) return
     
     try {
-      console.log('📄 Generando PDF con AWS Lambda real...')
       
       // Usar el consultationId real del procesamiento
       const response = await axios.post(
@@ -276,7 +267,6 @@ function AudioRecorder() {
         }
       )
       
-      console.log('PDF response:', response.data)
       
       if (response.data.downloadUrl) {
         // Si el PDF está en S3, abrir URL
@@ -287,7 +277,6 @@ function AudioRecorder() {
         window.open(downloadUrl, '_blank')
       }
       
-      console.log('✅ PDF real generado exitosamente con AWS Lambda')
       
     } catch (error) {
       console.error('Error generando PDF:', error)
@@ -306,18 +295,15 @@ function AudioRecorder() {
     }
     
     try {
-      console.log('💾 Guardando consulta en historial...')
       
       // La consulta ya debería estar guardada automáticamente en DynamoDB
       // durante el procesamiento, pero vamos a verificar
       if (consultationId) {
         // Verificar que se guardó correctamente
         const historyResponse = await axios.get(config.endpoints.getHistory)
-        console.log('Historial actualizado:', historyResponse.data)
         
         setError('')
         alert('✅ Consulta guardada exitosamente en el historial!')
-        console.log('✅ Consulta confirmada en historial')
       } else {
         // Si no hay consultationId, crear entrada manual
         const saveResponse = await axios.post(
@@ -326,7 +312,7 @@ function AudioRecorder() {
             transcription: transcription,
             transcriptionWithSpeakers: transcriptionWithSpeakers,
             aiAnalysis: analysis,
-            doctorId: 'doctor-demo',
+            doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
             patientId: patientData.patientId || patientData.patientName,
             patientName: patientData.patientName,
             specialty: patientData.specialty,
@@ -341,7 +327,6 @@ function AudioRecorder() {
         
         setConsultationId(saveResponse.data.consultationId)
         alert('✅ Consulta guardada exitosamente en el historial!')
-        console.log('✅ Consulta guardada manualmente:', saveResponse.data)
       }
       
     } catch (error) {

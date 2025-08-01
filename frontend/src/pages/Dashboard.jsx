@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import config from '../config'
+import { formatListDate, formatRelativeTime } from '../utils/dateUtils'
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -211,11 +212,28 @@ function Dashboard() {
                       {recentConsultations.slice(0, 5).map((consultation) => (
                         <tr key={consultation.consultationId}>
                           <td>
-                            <small>{consultation.formattedDate}</small>
+                            <div>
+                              <small className="text-muted">
+                                {formatListDate(consultation.createdAt)}
+                              </small>
+                              <br />
+                              <small className="text-primary">
+                                {formatRelativeTime(consultation.createdAt)}
+                              </small>
+                            </div>
                           </td>
                           <td>
-                            <strong>{consultation.patientName || consultation.patientId}</strong>
+                            <strong>
+                              {consultation.patientName || 
+                               (consultation.patientId?.startsWith('patient-') ? 
+                                'Paciente Sin Nombre' : 
+                                consultation.patientId) || 
+                               'Sin Identificar'}
+                            </strong>
                             {consultation.patientName && consultation.patientId !== consultation.patientName && (
+                              <small className="text-muted d-block">ID: {consultation.patientId}</small>
+                            )}
+                            {!consultation.patientName && consultation.patientId?.startsWith('patient-') && (
                               <small className="text-muted d-block">ID: {consultation.patientId}</small>
                             )}
                           </td>

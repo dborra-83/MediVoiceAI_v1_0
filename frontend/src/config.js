@@ -32,6 +32,46 @@ const config = {
   maxFileSize: 10 * 1024 * 1024, // 10MB
   supportedAudioFormats: ['audio/webm', 'audio/wav', 'audio/mp3'],
   
+  // Timezone Configuration
+  timezone: {
+    // Default timezone from environment or Argentina
+    default: import.meta.env.VITE_DEFAULT_TIMEZONE || 'America/Argentina/Buenos_Aires',
+    
+    // Available timezones for the application
+    available: {
+      'America/Argentina/Buenos_Aires': {
+        name: 'Argentina',
+        displayName: 'Argentina (UTC-3)',
+        utcOffset: -3,
+        country: 'AR'
+      },
+      'America/Santiago': {
+        name: 'Chile',
+        displayName: 'Chile (UTC-3/UTC-4)',
+        utcOffset: -3, // Changes with DST
+        country: 'CL'
+      },
+      'America/Bogota': {
+        name: 'Colombia', 
+        displayName: 'Colombia (UTC-5)',
+        utcOffset: -5,
+        country: 'CO'
+      }
+    },
+    
+    // Get current timezone from localStorage or default
+    getCurrent: () => {
+      return localStorage.getItem('medivoice_timezone') || 
+             import.meta.env.VITE_DEFAULT_TIMEZONE || 
+             'America/Argentina/Buenos_Aires'
+    },
+    
+    // Set timezone in localStorage
+    setCurrent: (timezone) => {
+      localStorage.setItem('medivoice_timezone', timezone)
+    }
+  },
+  
   // Feature Flags
   features: {
     authentication: import.meta.env.VITE_ENABLE_AUTH === 'true',
@@ -39,11 +79,11 @@ const config = {
     advancedAnalytics: import.meta.env.VITE_ENABLE_ANALYTICS === 'true'
   },
   
-  // Debug Configuration
+  // Debug Configuration - Only enabled in development
   debug: {
     showApiEndpoints: isDevelopment,
-    enableConsoleLogging: isDevelopment,
-    showNetworkRequests: isDevelopment
+    enableConsoleLogging: isDevelopment && false, // Disabled for production-ready code
+    showNetworkRequests: isDevelopment && false  // Disabled for production-ready code
   }
 }
 

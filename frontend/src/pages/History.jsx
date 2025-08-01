@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import config from '../config'
+import { formatListDate, formatMedicalDate, formatRelativeTime } from '../utils/dateUtils'
 
 function History() {
   const [consultations, setConsultations] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [selectedConsultation, setSelectedConsultation] = useState(null)
 
   useEffect(() => {
     loadConsultations()
@@ -14,11 +16,9 @@ function History() {
   const loadConsultations = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Cargando historial completo desde API real...')
       
       const response = await axios.get(config.endpoints.getHistory)
       
-      console.log('✅ Historial cargado:', response.data)
       
       if (response.data && response.data.consultations) {
         const consultationsData = response.data.consultations.map(consultation => ({
@@ -28,8 +28,9 @@ function History() {
           patientId: consultation.patientId,
           type: consultation.specialty || 'General',
           status: consultation.status || 'completed',
-          transcription: consultation.summary || 'Sin transcripción disponible',
-          aiAnalysis: consultation.hasAiAnalysis ? consultation.summary : null,
+          transcription: consultation.transcription || consultation.summary || 'Sin transcripción disponible',
+          transcriptionWithSpeakers: consultation.transcriptionWithSpeakers,
+          aiAnalysis: consultation.aiAnalysis || consultation.summary,
           pdfUrl: null,
           hasTranscription: consultation.hasTranscription,
           hasAiAnalysis: consultation.hasAiAnalysis
@@ -65,16 +66,7 @@ function History() {
     }
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  // Remove old formatDate function - now using dateUtils
 
   return (
     <div className="history">
@@ -197,7 +189,7 @@ function History() {
                       {filteredConsultations.map((consultation) => (
                         <tr key={consultation.id}>
                           <td>
-                            <small>{formatDate(consultation.date)}</small>
+                            <small>{formatListDate(consultation.date)}</small>
                           </td>
                           <td>
                             <strong>{consultation.patient}</strong>
@@ -215,8 +207,9 @@ function History() {
                             <div className="btn-group btn-group-sm">
                               <button 
                                 className="btn btn-outline-primary"
-                                data-bs-toggle="modal"
-                                data-bs-target={`#modal-${consultation.id}`}
+                                onClick={() => {
+                                  alert(`Consulta: ${consultation.id}\nPaciente: ${consultation.patient}`)
+                                }}
                               >
                                 <i className="fas fa-eye"></i>
                               </button>
@@ -264,7 +257,7 @@ function History() {
               <div className="modal-body">
                 <div className="row mb-3">
                   <div className="col-md-6">
-                    <strong>Fecha:</strong> {formatDate(consultation.date)}
+                    <strong>Fecha:</strong> {formatMedicalDate(consultation.date)}
                   </div>
                   <div className="col-md-6">
                     <strong>Tipo:</strong> {consultation.type}
@@ -273,16 +266,59 @@ function History() {
 
                 <div className="mb-3">
                   <h6>📝 Transcripción:</h6>
-                  <div className="bg-light p-3 rounded">
-                    <small>{consultation.transcription}</small>
-                  </div>
+                  {consultation.transcriptionWithSpeakers && consultation.transcriptionWithSpeakers !== consultation.transcription ? (
+                    <div>
+                      <div className="bg-light p-3 rounded mb-2">
+                        <strong>🎭 Con identificación de hablantes:</strong>
+                        <div className="mt-2" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95em' }}>
+                          {consultation.transcriptionWithSpeakers.split('\n').map((line, index) => {
+                            if (line.trim().startsWith('**')) {
+                              return <div key={index} className="fw-bold text-primary mt-2">{line.replace(/\*\*/g, '')}</div>
+                            } else if (line.trim()) {
+                              return <div key={index} className="ms-3">{line}</div>
+                            }
+                            return <div key={index}></div>
+                          })}
+                        </div>
+                      </div>
+                      <details>
+                        <summary className="text-muted" style={{ cursor: 'pointer' }}>
+                          📄 Ver transcripción completa (sin separación)
+                        </summary>
+                        <div className="bg-light p-2 rounded mt-2">
+                          <small>{consultation.transcription}</small>
+                        </div>
+                      </details>
+                    </div>
+                  ) : (
+                    <div className="bg-light p-3 rounded">
+                      <small>{consultation.transcription}</small>
+                    </div>
+                  )}
                 </div>
 
                 {consultation.aiAnalysis && (
                   <div className="mb-3">
                     <h6>🤖 Análisis de IA:</h6>
                     <div className="bg-info bg-opacity-10 p-3 rounded">
-                      <small>{consultation.aiAnalysis}</small>
+                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95em' }}>
+                        {typeof consultation.aiAnalysis === 'string' ? 
+                          consultation.aiAnalysis.split('\n').map((line, index) => (
+                            <div key={index}>
+                              {line.startsWith('##') ? (
+                                <strong className="text-primary d-block mt-3 mb-2">{line.replace('##', '').trim()}</strong>
+                              ) : line.startsWith('-') ? (
+                                <div className="ms-3">• {line.replace('-', '').trim()}</div>
+                              ) : line.trim() ? (
+                                <div>{line}</div>
+                              ) : (
+                                <div></div>
+                              )}
+                            </div>
+                          )) : 
+                          consultation.aiAnalysis
+                        }
+                      </div>
                     </div>
                   </div>
                 )}

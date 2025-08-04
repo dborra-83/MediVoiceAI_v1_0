@@ -8,10 +8,63 @@ function History() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const [detailView, setDetailView] = useState(false)
+  const [patientDetails, setPatientDetails] = useState(null)
 
   useEffect(() => {
     loadConsultations()
+    
+    // Check if we should show a specific consultation
+    const urlParams = new URLSearchParams(window.location.search)
+    const consultationId = urlParams.get('id')
+    if (consultationId) {
+      setDetailView(true)
+      // Will load the specific consultation after consultations are loaded
+    }
   }, [])
+
+  useEffect(() => {
+    // If we have consultations and need to show detail view
+    if (consultations.length > 0 && detailView) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const consultationId = urlParams.get('id')
+      if (consultationId) {
+        const consultation = consultations.find(c => c.id === consultationId)
+        if (consultation) {
+          setSelectedConsultation(consultation)
+          loadPatientDetails(consultation)
+        }
+      }
+    }
+  }, [consultations, detailView])
+
+  const loadPatientDetails = async (consultation) => {
+    try {
+      // Since we don't have a separate patients endpoint yet, 
+      // we'll extract patient info from the consultation data
+      // or make a call to the managePatients function
+      
+      if (consultation.patientId && consultation.patientId.startsWith('patient-')) {
+        // Try to get patient details from the managePatients endpoint
+        const response = await axios.post(`${config.apiUrl}/api/patients`, {
+          action: 'get',
+          patientId: consultation.patientId
+        })
+        
+        if (response.data.success && response.data.patient) {
+          setPatientDetails(response.data.patient)
+        } else {
+          setPatientDetails(null)
+        }
+      } else {
+        // For now, set patient details to null if we can't find them
+        setPatientDetails(null)
+      }
+    } catch (error) {
+      console.log(`No se encontraron detalles para el paciente: ${consultation.patient}`)
+      setPatientDetails(null)
+    }
+  }
 
   const loadConsultations = async () => {
     try {
@@ -21,10 +74,15 @@ function History() {
       
       
       if (response.data && response.data.consultations) {
+        // Debug logging for development
+        if (config.isDevelopment) {
+          console.log('History data received:', response.data.consultations.length, 'consultations')
+        }
+        
         const consultationsData = response.data.consultations.map(consultation => ({
           id: consultation.consultationId,
           date: consultation.createdAt,
-          patient: consultation.patientName || consultation.patientId || 'Sin identificar',
+          patient: consultation.patientName && consultation.patientName !== consultation.patientId ? consultation.patientName : 'Sin identificar',
           patientId: consultation.patientId,
           type: consultation.specialty || 'General',
           status: consultation.status || 'completed',
@@ -67,6 +125,229 @@ function History() {
   }
 
   // Remove old formatDate function - now using dateUtils
+
+  // Show detailed view if we have a selected consultation
+  if (detailView && selectedConsultation) {
+    return (
+      <div className="consultation-detail">
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <h1 className="h2">📋 Detalle de Consulta</h1>
+                <p className="text-muted">
+                  Consulta del {formatMedicalDate(selectedConsultation.date)}
+                </p>
+              </div>
+              <button 
+                className="btn btn-outline-secondary"
+                onClick={() => {
+                  setDetailView(false)
+                  setSelectedConsultation(null)
+                  setPatientDetails(null)
+                  window.history.pushState({}, '', '/history')
+                }}
+              >
+                <i className="fas fa-arrow-left me-2"></i>
+                Volver al Historial
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Patient Information Card */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="card">
+              <div className="card-header">
+                <h5>👤 Información del Paciente</h5>
+              </div>
+              <div className="card-body">
+                <div className="row">
+                  <div className="col-md-6">
+                    <h6 className="mb-3">
+                      <strong>{selectedConsultation.patient}</strong>
+                    </h6>
+                    {patientDetails ? (
+                      <div>
+                        {patientDetails.age && (
+                          <p className="mb-2">
+                            <i className="fas fa-birthday-cake me-2 text-muted"></i>
+                            <strong>Edad:</strong> {patientDetails.age} años
+                          </p>
+                        )}
+                        {patientDetails.gender && (
+                          <p className="mb-2">
+                            <i className="fas fa-user me-2 text-muted"></i>
+                            <strong>Género:</strong> {patientDetails.gender}
+                          </p>
+                        )}
+                        {patientDetails.patient_document && (
+                          <p className="mb-2">
+                            <i className="fas fa-id-card me-2 text-muted"></i>
+                            <strong>Documento:</strong> {patientDetails.patient_document}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-muted">No se encontró información adicional del paciente</p>
+                    )}
+                  </div>
+                  <div className="col-md-6">
+                    {patientDetails && (
+                      <div>
+                        {patientDetails.phone && (
+                          <p className="mb-2">
+                            <i className="fas fa-phone me-2 text-muted"></i>
+                            <strong>Teléfono:</strong> {patientDetails.phone}
+                          </p>
+                        )}
+                        {patientDetails.email && (
+                          <p className="mb-2">
+                            <i className="fas fa-envelope me-2 text-muted"></i>
+                            <strong>Email:</strong> {patientDetails.email}
+                          </p>
+                        )}
+                        {patientDetails.address && (
+                          <p className="mb-2">
+                            <i className="fas fa-map-marker-alt me-2 text-muted"></i>
+                            <strong>Dirección:</strong> {patientDetails.address}
+                          </p>
+                        )}
+                        {patientDetails.emergency_contact && (
+                          <p className="mb-2">
+                            <i className="fas fa-phone-alt me-2 text-muted"></i>
+                            <strong>Contacto de Emergencia:</strong> {patientDetails.emergency_contact}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {patientDetails && (patientDetails.medical_history || patientDetails.allergies || patientDetails.medications) && (
+                  <div className="row mt-3">
+                    <div className="col-12">
+                      <hr />
+                      <h6>📋 Información Médica</h6>
+                      {patientDetails.medical_history && (
+                        <p className="mb-2">
+                          <strong>Historial Médico:</strong> {patientDetails.medical_history}
+                        </p>
+                      )}
+                      {patientDetails.allergies && (
+                        <p className="mb-2">
+                          <strong>Alergias:</strong> {patientDetails.allergies}
+                        </p>
+                      )}
+                      {patientDetails.medications && (
+                        <p className="mb-2">
+                          <strong>Medicamentos:</strong> {patientDetails.medications}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Consultation Details */}
+        <div className="row mb-4">
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-header">
+                <h5>📄 Transcripción</h5>
+              </div>
+              <div className="card-body">
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {selectedConsultation.transcriptionWithSpeakers ? (
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>
+                      {selectedConsultation.transcriptionWithSpeakers}
+                    </pre>
+                  ) : (
+                    <p>{selectedConsultation.transcription}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-header">
+                <h5>🤖 Análisis con IA</h5>
+              </div>
+              <div className="card-body">
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {selectedConsultation.aiAnalysis ? (
+                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>
+                      {selectedConsultation.aiAnalysis}
+                    </div>
+                  ) : (
+                    <p className="text-muted">No hay análisis de IA disponible</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="row">
+          <div className="col-12">
+            <div className="card">
+              <div className="card-body text-center">
+                <h6>Acciones</h6>
+                <div className="btn-group mb-3">
+                  <button className="btn btn-success">
+                    <i className="fas fa-file-pdf me-2"></i>
+                    Generar PDF
+                  </button>
+                  <button className="btn btn-primary">
+                    <i className="fas fa-edit me-2"></i>
+                    Editar Información del Paciente
+                  </button>
+                  <button className="btn btn-info">
+                    <i className="fas fa-share me-2"></i>
+                    Compartir
+                  </button>
+                </div>
+                
+                {/* Audio access section */}
+                <div className="border-top pt-3">
+                  <h6 className="text-muted">🎧 Audio de la Consulta</h6>
+                  {selectedConsultation && (
+                    <div className="row justify-content-center">
+                      <div className="col-md-8">
+                        <div className="alert alert-info">
+                          <p className="mb-2">
+                            <strong>ID de Audio:</strong> {selectedConsultation.patientId || 'No disponible'}
+                          </p>
+                          <p className="mb-2">
+                            <strong>Fecha de grabación:</strong> {formatMedicalDate(selectedConsultation.date)}
+                          </p>
+                          <button 
+                            className="btn btn-warning btn-sm"
+                            onClick={() => {
+                              alert('Función de descarga de audio en desarrollo.\n\nEn la versión completa, aquí podrás:\n• Descargar el archivo de audio original\n• Reproducir el audio directamente\n• Compartir el enlace de audio seguro')
+                            }}
+                          >
+                            <i className="fas fa-download me-2"></i>
+                            Descargar Audio (En desarrollo)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="history">
@@ -208,8 +489,12 @@ function History() {
                               <button 
                                 className="btn btn-outline-primary"
                                 onClick={() => {
-                                  alert(`Consulta: ${consultation.id}\nPaciente: ${consultation.patient}`)
+                                  setSelectedConsultation(consultation)
+                                  setDetailView(true)
+                                  loadPatientDetails(consultation)
+                                  window.history.pushState({}, '', `/history?id=${consultation.id}`)
                                 }}
+                                title="Ver detalles"
                               >
                                 <i className="fas fa-eye"></i>
                               </button>

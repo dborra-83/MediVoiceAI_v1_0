@@ -11,10 +11,32 @@ function Dashboard() {
   })
   const [recentConsultations, setRecentConsultations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [enrichedConsultations, setEnrichedConsultations] = useState([])
+  const [patientStats, setPatientStats] = useState({
+    totalPatients: 0,
+    newPatientsToday: 0,
+    patientsWithCompleteInfo: 0
+  })
 
   useEffect(() => {
     loadRecentConsultations()
   }, [])
+
+  // Function to fetch patient details
+  const fetchPatientDetails = async (patientName) => {
+    try {
+      const response = await axios.get(`${config.apiUrl}/api/patients`, {
+        params: { name: patientName }
+      })
+      
+      if (response.data.success && response.data.patients.length > 0) {
+        return response.data.patients[0]
+      }
+    } catch (error) {
+      console.log(`No se encontraron detalles para el paciente: ${patientName}`)
+    }
+    return null
+  }
 
   const loadRecentConsultations = async () => {
     try {
@@ -31,6 +53,22 @@ function Dashboard() {
         const consultations = response.data.consultations
         setRecentConsultations(consultations)
         
+        // Enrich consultations with patient details
+        const enrichedConsultationsData = await Promise.all(
+          consultations.map(async (consultation) => {
+            if (consultation.patientName && consultation.patientName !== 'Sin nombre') {
+              const patientDetails = await fetchPatientDetails(consultation.patientName)
+              return {
+                ...consultation,
+                patientDetails: patientDetails
+              }
+            }
+            return consultation
+          })
+        )
+        
+        setEnrichedConsultations(enrichedConsultationsData)
+        
         // Calcular estadísticas reales
         const today = new Date().toDateString()
         const todayCount = consultations.filter(c => 
@@ -41,6 +79,36 @@ function Dashboard() {
           totalConsultations: response.data.count || consultations.length,
           todayConsultations: todayCount,
           pendingReports: consultations.filter(c => c.status === 'processing').length
+        })
+
+        // Calcular estadísticas de pacientes
+        const uniquePatients = new Set()
+        const newPatientsToday = new Set()
+        let patientsWithCompleteInfo = 0
+
+        enrichedConsultationsData.forEach(consultation => {
+          if (consultation.patientName && consultation.patientName !== 'Sin nombre') {
+            uniquePatients.add(consultation.patientName)
+            
+            // Check if consultation was created today and add to new patients
+            if (new Date(consultation.createdAt).toDateString() === today) {
+              newPatientsToday.add(consultation.patientName)
+            }
+            
+            // Check if patient has complete information
+            if (consultation.patientDetails && 
+                consultation.patientDetails.age && 
+                consultation.patientDetails.gender && 
+                consultation.patientDetails.phone) {
+              patientsWithCompleteInfo++
+            }
+          }
+        })
+
+        setPatientStats({
+          totalPatients: uniquePatients.size,
+          newPatientsToday: newPatientsToday.size,
+          patientsWithCompleteInfo: Math.min(patientsWithCompleteInfo, uniquePatients.size)
         })
       }
       
@@ -110,6 +178,57 @@ function Dashboard() {
                 </div>
                 <div className="align-self-center">
                   <i className="fas fa-clock fa-2x"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Patient Statistics Row */}
+      <div className="row mb-4">
+        <div className="col-md-4">
+          <div className="card text-white bg-info">
+            <div className="card-body">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <h4 className="card-title">{patientStats.totalPatients}</h4>
+                  <p className="card-text">Total Pacientes</p>
+                </div>
+                <div className="align-self-center">
+                  <i className="fas fa-users fa-2x"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="col-md-4">
+          <div className="card text-white bg-secondary">
+            <div className="card-body">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <h4 className="card-title">{patientStats.newPatientsToday}</h4>
+                  <p className="card-text">Pacientes Nuevos Hoy</p>
+                </div>
+                <div className="align-self-center">
+                  <i className="fas fa-user-plus fa-2x"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="col-md-4">
+          <div className="card text-white bg-dark">
+            <div className="card-body">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <h4 className="card-title">{patientStats.patientsWithCompleteInfo}</h4>
+                  <p className="card-text">Con Info Completa</p>
+                </div>
+                <div className="align-self-center">
+                  <i className="fas fa-user-check fa-2x"></i>
                 </div>
               </div>
             </div>
@@ -202,14 +321,14 @@ function Dashboard() {
                     <thead>
                       <tr>
                         <th>Fecha</th>
-                        <th>Paciente</th>
+                        <th>Información del Paciente</th>
                         <th>Especialidad</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {recentConsultations.slice(0, 5).map((consultation) => (
+                      {(enrichedConsultations.length > 0 ? enrichedConsultations : recentConsultations).slice(0, 5).map((consultation) => (
                         <tr key={consultation.consultationId}>
                           <td>
                             <div>
@@ -223,19 +342,51 @@ function Dashboard() {
                             </div>
                           </td>
                           <td>
-                            <strong>
-                              {consultation.patientName || 
-                               (consultation.patientId?.startsWith('patient-') ? 
-                                'Paciente Sin Nombre' : 
-                                consultation.patientId) || 
-                               'Sin Identificar'}
-                            </strong>
-                            {consultation.patientName && consultation.patientId !== consultation.patientName && (
-                              <small className="text-muted d-block">ID: {consultation.patientId}</small>
-                            )}
-                            {!consultation.patientName && consultation.patientId?.startsWith('patient-') && (
-                              <small className="text-muted d-block">ID: {consultation.patientId}</small>
-                            )}
+                            <div>
+                              <strong className="d-block">
+                                {consultation.patientName || 
+                                 (consultation.patientId?.startsWith('patient-') ? 
+                                  'Paciente Sin Nombre' : 
+                                  consultation.patientId) || 
+                                 'Sin Identificar'}
+                              </strong>
+                              
+                              {consultation.patientDetails && (
+                                <div className="mt-1">
+                                  {consultation.patientDetails.age && (
+                                    <small className="text-muted me-3">
+                                      <i className="fas fa-birthday-cake me-1"></i>
+                                      {consultation.patientDetails.age} años
+                                    </small>
+                                  )}
+                                  {consultation.patientDetails.gender && (
+                                    <small className="text-muted me-3">
+                                      <i className="fas fa-user me-1"></i>
+                                      {consultation.patientDetails.gender}
+                                    </small>
+                                  )}
+                                  {consultation.patientDetails.phone && (
+                                    <small className="text-muted d-block">
+                                      <i className="fas fa-phone me-1"></i>
+                                      {consultation.patientDetails.phone}
+                                    </small>
+                                  )}
+                                  {consultation.patientDetails.patient_document && (
+                                    <small className="text-muted d-block">
+                                      <i className="fas fa-id-card me-1"></i>
+                                      Doc: {consultation.patientDetails.patient_document}
+                                    </small>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {!consultation.patientDetails && consultation.patientName && consultation.patientId !== consultation.patientName && (
+                                <small className="text-muted d-block">ID: {consultation.patientId}</small>
+                              )}
+                              {!consultation.patientDetails && !consultation.patientName && consultation.patientId?.startsWith('patient-') && (
+                                <small className="text-muted d-block">ID: {consultation.patientId}</small>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <span className="badge bg-info">

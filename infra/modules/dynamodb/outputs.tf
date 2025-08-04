@@ -26,4 +26,14 @@ output "doctors_table_name" {
 output "doctors_table_arn" {
   description = "ARN de la tabla de doctores"
   value       = aws_dynamodb_table.doctors.arn
+}
+
+output "patients_table_name" {
+  description = "Nombre de la tabla de pacientes"
+  value       = aws_dynamodb_table.patients.name
+}
+
+output "patients_table_arn" {
+  description = "ARN de la tabla de pacientes"
+  value       = aws_dynamodb_table.patients.arn
 } 

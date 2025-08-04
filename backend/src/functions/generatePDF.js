@@ -225,23 +225,29 @@ const generatePrescriptionPDF = (consultationData, doctorData) => {
 }
 
 exports.handler = async (event) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+  }
+
   try {
-    console.log('Generando PDF:', JSON.stringify(event, null, 2))
-    
-    // Verificar autenticación
-    const user = event.requestContext.authorizer?.claims
-    if (!user) {
+    // Handle OPTIONS preflight request
+    if (event.httpMethod === 'OPTIONS') {
       return {
-        statusCode: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Access-Control-Allow-Methods': 'POST,OPTIONS'
-        },
-        body: JSON.stringify({ error: 'No autorizado' })
+        statusCode: 200,
+        headers: corsHeaders,
+        body: ''
       }
     }
+
+    console.log('Generando PDF:', JSON.stringify(event, null, 2))
+    
+    // Verificar autenticación (opcional en desarrollo)
+    const user = event.requestContext?.authorizer?.claims
+    const userId = user?.sub || 'anonymous'
+    
+    // For development, continue without authentication
 
     // Parsear body
     let body
@@ -252,9 +258,7 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Access-Control-Allow-Methods': 'POST,OPTIONS'
+          ...corsHeaders
         },
         body: JSON.stringify({ error: 'Body inválido' })
       }
@@ -267,9 +271,7 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Access-Control-Allow-Methods': 'POST,OPTIONS'
+          ...corsHeaders
         },
         body: JSON.stringify({ 
           error: 'consultationId y doctorId son requeridos' 
@@ -291,9 +293,7 @@ exports.handler = async (event) => {
         statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Access-Control-Allow-Methods': 'POST,OPTIONS'
+          ...corsHeaders
         },
         body: JSON.stringify({ error: 'Consulta no encontrada' })
       }
@@ -306,7 +306,7 @@ exports.handler = async (event) => {
     const pdfBuffer = generatePrescriptionPDF(consultationResponse.Item, doctorData)
     
     // Subir PDF a S3
-    const pdfKey = `pdfs/${user.sub}/${consultationId}/receta-${Date.now()}.pdf`
+    const pdfKey = `pdfs/${userId}/${consultationId}/receta-${Date.now()}.pdf`
     
     await s3Client.send(new PutObjectCommand({
       Bucket: process.env.PDF_BUCKET_NAME,
@@ -314,7 +314,7 @@ exports.handler = async (event) => {
       Body: pdfBuffer,
       ContentType: 'application/pdf',
       Metadata: {
-        'user-id': user.sub,
+        'user-id': userId,
         'consultation-id': consultationId,
         'doctor-id': doctorId,
         'generated-at': new Date().toISOString()
@@ -327,9 +327,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Access-Control-Allow-Methods': 'POST,OPTIONS'
+        ...corsHeaders
       },
       body: JSON.stringify({
         success: true,
@@ -348,9 +346,7 @@ exports.handler = async (event) => {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Access-Control-Allow-Methods': 'POST,OPTIONS'
+        ...corsHeaders
       },
       body: JSON.stringify({
         error: 'Error interno del servidor',

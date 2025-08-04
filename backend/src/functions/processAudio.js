@@ -3,7 +3,7 @@ const { S3Client, GetObjectCommand, HeadBucketCommand } = require("@aws-sdk/clie
 const { TranscribeClient, StartTranscriptionJobCommand, GetTranscriptionJobCommand } = require("@aws-sdk/client-transcribe");
 const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, PutCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
+const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
 
 // Create AWS clients
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
@@ -39,6 +39,80 @@ const checkTranscriptionStatus = async (jobName) => {
   } catch (error) {
     console.error('Error checking transcription status:', error);
     return { status: 'ERROR', error: error.message };
+  }
+};
+
+// Create or update patient information
+const createOrUpdatePatient = async (patientData) => {
+  const {
+    patientName,
+    patientDocument = '',
+    age = '',
+    gender = '',
+    phone = '',
+    email = '',
+    address = '',
+    emergencyContact = '',
+    medicalHistory = '',
+    allergies = '',
+    medications = ''
+  } = patientData;
+
+  if (!patientName || patientName.trim() === '') {
+    throw new Error('Patient name is required');
+  }
+
+  try {
+    // First check if patient already exists by name
+    const searchCommand = new QueryCommand({
+      TableName: process.env.PATIENTS_TABLE,
+      IndexName: 'PatientNameIndex',
+      KeyConditionExpression: 'patient_name = :name',
+      ExpressionAttributeValues: {
+        ':name': patientName.trim()
+      },
+      Limit: 1
+    });
+
+    const existingPatient = await docClient.send(searchCommand);
+    
+    if (existingPatient.Items && existingPatient.Items.length > 0) {
+      // Patient exists, return existing patient
+      return existingPatient.Items[0];
+    } else {
+      // Patient doesn't exist, create new one
+      const patientId = `patient-${generateUUID()}`;
+      const timestamp = new Date().toISOString();
+      
+      const newPatient = {
+        patient_id: patientId,
+        patient_name: patientName.trim(),
+        patient_document: patientDocument,
+        age,
+        gender,
+        phone,
+        email,
+        address,
+        emergency_contact: emergencyContact,
+        medical_history: medicalHistory,
+        allergies,
+        medications,
+        created_at: timestamp,
+        updated_at: timestamp
+      };
+
+      const putCommand = new PutCommand({
+        TableName: process.env.PATIENTS_TABLE,
+        Item: newPatient
+      });
+
+      await docClient.send(putCommand);
+      return newPatient;
+    }
+
+  } catch (error) {
+    console.error('Error creating/updating patient:', error);
+    throw error;
   }
 };
 
@@ -79,7 +153,70 @@ exports.handler = async (event) => {
         };
       }
 
-      const { audioKey, patientId, doctorId, specialty = 'general', checkStatus = false, consultationId: existingId, saveOnly = false, transcription, transcriptionWithSpeakers, aiAnalysis, patientName } = body;
+      const { 
+        audioKey, 
+        patientId, 
+        doctorId, 
+        specialty = 'general', 
+        checkStatus = false, 
+        consultationId: existingId, 
+        saveOnly = false, 
+        transcription, 
+        transcriptionWithSpeakers, 
+        aiAnalysis, 
+        patientName,
+        patientDocument,
+        age,
+        gender,
+        phone,
+        email,
+        address,
+        emergencyContact,
+        medicalHistory,
+        allergies,
+        medications
+      } = body;
+
+      // DEBUG: Log received patient data
+      console.log('🔍 DEBUG - processAudio recibió datos del paciente:', {
+        patientName,
+        patientNameType: typeof patientName,
+        patientNameLength: patientName ? patientName.length : 0,
+        patientNameTrimmed: patientName ? patientName.trim() : '',
+        patientNameTrimmedLength: patientName ? patientName.trim().length : 0,
+        patientId,
+        age,
+        gender,
+        specialty,
+        saveOnly,
+        audioKey: audioKey ? 'presente' : 'ausente'
+      });
+      
+      // Additional validation for patient name
+      if (!patientName || typeof patientName !== 'string' || patientName.trim() === '') {
+        console.error('❌ ERROR - Invalid patient name received:', {
+          patientName,
+          type: typeof patientName,
+          isEmpty: patientName === '',
+          isUndefined: patientName === undefined,
+          isNull: patientName === null
+        });
+        
+        return {
+          statusCode: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          },
+          body: JSON.stringify({ 
+            error: 'Patient name is required and cannot be empty',
+            received: {
+              patientName,
+              type: typeof patientName
+            }
+          })
+        };
+      }
 
       if (!audioKey && !saveOnly) {
         return {
@@ -98,22 +235,54 @@ exports.handler = async (event) => {
       const user = event.requestContext?.authorizer?.claims;
       const userId = user?.sub || 'anonymous';
       const currentDoctorId = doctorId || userId;
-      const currentPatientId = patientId || patientName || `patient-${Date.now()}`;
+      const cleanPatientName = patientName.trim();
+      const currentPatientId = patientId || cleanPatientName || `patient-${Date.now()}`;
       
       const consultationId = existingId || generateUUID();
       const timestamp = new Date().toISOString();
+      
+      // DEBUG: Log processed patient data
+      console.log('🔍 DEBUG - Datos procesados del paciente:', {
+        cleanPatientName,
+        currentPatientId,
+        currentDoctorId
+      });
 
 
       try {
         // Handle save-only request (manual save to history)
         if (saveOnly && transcription && aiAnalysis) {
           
+          // Create or update patient information if patients table exists
+          let patientInfo = null;
+          if (process.env.PATIENTS_TABLE && cleanPatientName) {
+            try {
+              patientInfo = await createOrUpdatePatient({
+                patientName: cleanPatientName,
+                patientDocument,
+                age,
+                gender,
+                phone,
+                email,
+                address,
+                emergencyContact,
+                medicalHistory,
+                allergies,
+                medications
+              });
+              console.log('Patient info created/updated:', patientInfo.patient_id);
+            } catch (error) {
+              console.error('Error creating/updating patient:', error);
+              // Continue with consultation save even if patient creation fails
+            }
+          }
+          
           if (process.env.CONSULTATIONS_TABLE) {
             const consultationData = {
               consultation_id: consultationId,
               doctor_id: currentDoctorId,
-              patient_id: currentPatientId,
-              patient_name: patientName || 'Sin nombre',
+              patient_id: patientInfo ? patientInfo.patient_id : (patientId || currentPatientId),
+              patient_name: cleanPatientName,
               audio_key: audioKey || `manual-save-${Date.now()}`,
               transcription: transcription,
               transcription_with_speakers: transcriptionWithSpeakers || transcription,
@@ -314,13 +483,37 @@ Transcripción a analizar: ${transcriptionText}`;
               const aiAnalysis = aiAnalysisResult.content[0].text;
 
 
+              // Create or update patient information if patients table exists
+              let patientInfo = null;
+              if (process.env.PATIENTS_TABLE && cleanPatientName) {
+                try {
+                  patientInfo = await createOrUpdatePatient({
+                    patientName: cleanPatientName,
+                    patientDocument,
+                    age,
+                    gender,
+                    phone,
+                    email,
+                    address,
+                    emergencyContact,
+                    medicalHistory,
+                    allergies,
+                    medications
+                  });
+                  console.log('Patient info created/updated during processing:', patientInfo.patient_id);
+                } catch (error) {
+                  console.error('Error creating/updating patient during processing:', error);
+                  // Continue with consultation save even if patient creation fails
+                }
+              }
+
               // Save consultation to REAL DynamoDB
               if (process.env.CONSULTATIONS_TABLE) {
                 const consultationData = {
                   consultation_id: consultationId,
                   doctor_id: currentDoctorId,
-                  patient_id: currentPatientId,
-                  patient_name: patientName || 'Sin nombre',
+                  patient_id: patientInfo ? patientInfo.patient_id : currentPatientId,
+                  patient_name: cleanPatientName,
                   audio_key: audioKey,
                   transcription: transcriptionText,
                   transcription_with_speakers: speakerTranscription,

@@ -13,6 +13,7 @@ provider:
     CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}
     PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}
     DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
+    PATIENTS_TABLE: ${env:PATIENTS_TABLE, 'medivoice-ai-dev-patients'}
     BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-3-5-sonnet-20240620-v1:0'}
     ENVIRONMENT: ${env:STAGE, 'dev'}
   
@@ -46,6 +47,8 @@ provider:
             - arn:aws:dynamodb:*:*:table/${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}/index/*
             - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
             - arn:aws:dynamodb:*:*:table/${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}/index/*
+            - arn:aws:dynamodb:*:*:table/${env:PATIENTS_TABLE, 'medivoice-ai-dev-patients'}
+            - arn:aws:dynamodb:*:*:table/${env:PATIENTS_TABLE, 'medivoice-ai-dev-patients'}/index/*
         
         - Effect: Allow
           Action:
@@ -104,6 +107,7 @@ functions:
       CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-ai-dev-consultations'}
       PROMPTS_TABLE: ${env:PROMPTS_TABLE, 'medivoice-ai-dev-prompts'}
       DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-ai-dev-doctors'}
+      PATIENTS_TABLE: ${env:PATIENTS_TABLE, 'medivoice-ai-dev-patients'}
       BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-3-5-sonnet-20240620-v1:0'}
     
     timeout: 30
@@ -144,6 +148,36 @@ functions:
     environment:
       CONSULTATIONS_TABLE: ${env:CONSULTATIONS_TABLE, 'medivoice-consultations-dev'}
       DOCTORS_TABLE: ${env:DOCTORS_TABLE, 'medivoice-doctors-dev'}
+    
+    timeout: 30
+    memorySize: 512
+
+  managePatients:
+    handler: src/functions/managePatients.handler
+    events:
+      - http:
+          path: /api/patients
+          method: post
+          cors: true
+      - http:
+          path: /api/patients
+          method: get
+          cors: true
+      - http:
+          path: /api/patients/{patientId}
+          method: get
+          cors: true
+      - http:
+          path: /api/patients/{patientId}
+          method: put
+          cors: true
+          # authorizer:
+          #   name: cognitoAuthorizer
+          #   type: COGNITO_USER_POOLS
+          #   arn: ${env:COGNITO_USER_POOL_ARN}
+    
+    environment:
+      PATIENTS_TABLE: ${env:PATIENTS_TABLE, 'medivoice-ai-dev-patients'}
     
     timeout: 30
     memorySize: 512

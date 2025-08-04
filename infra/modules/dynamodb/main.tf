@@ -127,6 +127,42 @@ resource "aws_dynamodb_table" "doctors" {
   }
 }
 
+# Tabla de información de pacientes
+resource "aws_dynamodb_table" "patients" {
+  name           = "${var.project_name}-${var.environment}-patients"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "patient_id"
+
+  attribute {
+    name = "patient_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "patient_name"
+    type = "S"
+  }
+
+  attribute {
+    name = "created_at"
+    type = "S"
+  }
+
+  # Índice global secundario para búsquedas por nombre
+  global_secondary_index {
+    name            = "PatientNameIndex"
+    hash_key        = "patient_name"
+    range_key       = "created_at"
+    projection_type = "ALL"
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-patients"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
 # Nota: Los datos iniciales para prompts y doctores se pueden añadir
 # después del deploy usando scripts o la consola de AWS
 # Esto evita problemas de formato en Terraform 

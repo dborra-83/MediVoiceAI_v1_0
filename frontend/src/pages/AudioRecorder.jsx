@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import config from '../config'
+import Swal from 'sweetalert2'
 
 function AudioRecorder() {
   // Estados del formulario pre-grabación
@@ -10,6 +11,13 @@ function AudioRecorder() {
     patientId: '',
     age: '',
     gender: '',
+    phone: '',
+    email: '',
+    address: '',
+    emergencyContact: '',
+    medicalHistory: '',
+    allergies: '',
+    medications: '',
     specialty: 'general',
     consultationType: 'consulta',
     notes: ''
@@ -26,10 +34,124 @@ function AudioRecorder() {
   const [error, setError] = useState('')
   const [recordingTime, setRecordingTime] = useState(0)
   const [processingStatus, setProcessingStatus] = useState('')
+  const [shouldAutoProcess, setShouldAutoProcess] = useState(false)
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   
   const mediaRecorderRef = useRef(null)
   const streamRef = useRef(null)
   const timerRef = useRef(null)
+
+  // Auto-process when audioBlob is ready after recording
+  useEffect(() => {
+    if (audioBlob && shouldAutoProcess && !processing) {
+      setShouldAutoProcess(false) // Reset flag
+      // Small delay to ensure state is fully updated
+      setTimeout(() => {
+        processAudio()
+      }, 100)
+    }
+  }, [audioBlob, shouldAutoProcess, processing])
+
+  // Auto-save function with SweetAlert2
+  const performAutoSave = async () => {
+    if (!transcription || !analysis || !autoSaveEnabled) return
+
+    try {
+      // Show loading alert
+      Swal.fire({
+        title: 'Guardando consulta...',
+        text: 'Por favor espera mientras guardamos tu consulta',
+        icon: 'info',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          Swal.showLoading()
+        }
+      })
+
+      // The consultation should already be saved during processing,
+      // but we can verify it was saved correctly
+      if (consultationId) {
+        // Show success with option to go to dashboard
+        const result = await Swal.fire({
+          title: '¡Consulta guardada exitosamente!',
+          text: '¿Te gustaría ir al dashboard para ver el historial de consultas?',
+          icon: 'success',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#6c757d',
+          confirmButtonText: 'Ir al Dashboard',
+          cancelButtonText: 'Continuar aquí',
+          timer: 5000,
+          timerProgressBar: true
+        })
+
+        if (result.isConfirmed) {
+          // Redirect to dashboard
+          window.location.href = '/dashboard'
+        }
+      } else {
+        // If no consultationId, try manual save
+        const saveResponse = await axios.post(
+          config.endpoints.processAudio,
+          {
+            transcription: transcription,
+            transcriptionWithSpeakers: transcriptionWithSpeakers,
+            aiAnalysis: analysis,
+            doctorId: 'anonymous',
+            patientId: patientData.patientId || patientData.patientName,
+            patientName: patientData.patientName,
+            patientDocument: patientData.patientId,
+            age: patientData.age,
+            gender: patientData.gender,
+            phone: patientData.phone || '',
+            email: patientData.email || '',
+            address: patientData.address || '',
+            emergencyContact: patientData.emergencyContact || '',
+            medicalHistory: patientData.medicalHistory || '',
+            allergies: patientData.allergies || '',
+            medications: patientData.medications || '',
+            specialty: patientData.specialty,
+            saveOnly: true
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }
+        )
+
+        if (saveResponse.data.success) {
+          setConsultationId(saveResponse.data.consultationId)
+          
+          const result = await Swal.fire({
+            title: '¡Consulta guardada exitosamente!',
+            text: '¿Te gustaría ir al dashboard para ver el historial de consultas?',
+            icon: 'success',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ir al Dashboard',
+            cancelButtonText: 'Continuar aquí',
+            timer: 5000,
+            timerProgressBar: true
+          })
+
+          if (result.isConfirmed) {
+            window.location.href = '/dashboard'
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error en auto-save:', error)
+      Swal.fire({
+        title: 'Error al guardar',
+        text: 'Hubo un problema al guardar la consulta automáticamente. Puedes intentar guardarla manualmente.',
+        icon: 'error',
+        confirmButtonText: 'Entendido'
+      })
+    }
+  }
 
   // Función para verificar el estado del procesamiento periódicamente
   const pollForCompletion = async (audioKey, consultationId) => {
@@ -63,6 +185,12 @@ function AudioRecorder() {
           setTranscriptionWithSpeakers(statusResponse.data.transcriptionWithSpeakers || statusResponse.data.transcription)
           setAnalysis(statusResponse.data.aiAnalysis)
           setProcessing(false)
+          
+          // Trigger auto-save after a short delay to ensure state is updated
+          setTimeout(() => {
+            performAutoSave()
+          }, 500)
+          
           return
         } else if (statusResponse.data.status === 'failed') {
           throw new Error(statusResponse.data.error || 'Procesamiento falló')
@@ -146,6 +274,7 @@ function AudioRecorder() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
+      setShouldAutoProcess(true) // Set flag for auto-processing
       
       // Limpiar timer
       if (timerRef.current) {
@@ -158,6 +287,24 @@ function AudioRecorder() {
 
   const processAudio = async () => {
     if (!audioBlob) return
+    
+    // Ensure we have a valid patient name first
+    const cleanPatientName = patientData.patientName?.trim()
+    if (!cleanPatientName) {
+      setError('Error crítico: Nombre del paciente está vacío. No se puede procesar.')
+      return
+    }
+    
+    // DEBUG: Validate patient data before sending
+    console.log('🔍 DEBUG - Validación final antes de enviar:', {
+      patientNameOriginal: patientData.patientName,
+      patientNameTrimmed: cleanPatientName,
+      patientNameLength: cleanPatientName.length,
+      isEmpty: cleanPatientName === '',
+      isUndefined: patientData.patientName === undefined,
+      isNull: patientData.patientName === null
+    })
+    console.log('🔍 VALORES RAW:', 'Original:', `"${patientData.patientName}"`, 'Clean:', `"${cleanPatientName}"`)
     
     setProcessing(true)
     setError('')
@@ -173,15 +320,29 @@ function AudioRecorder() {
       
       // 1. Subir audio a S3
       
+      // DEBUG: Log upload data
+      const uploadPayload = {
+        audioData: 'BASE64_DATA_HIDDEN',
+        fileName: 'recording.webm',
+        contentType: 'audio/webm',
+        doctorId: 'anonymous',
+        patientId: patientData.patientId || cleanPatientName,
+        patientName: cleanPatientName
+      }
+      if (config.isDevelopment) {
+        console.log('Upload data:', uploadPayload)
+      }
+      // Ready to upload audio to S3
+      
       const uploadResponse = await axios.post(
         config.endpoints.uploadAudio, 
         {
           audioData: audioBase64,
           fileName: 'recording.webm',
           contentType: 'audio/webm',
-          doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
-          patientId: patientData.patientId || patientData.patientName,
-          patientName: patientData.patientName
+          doctorId: 'anonymous', // Will be replaced with real Cognito user ID
+          patientId: patientData.patientId || cleanPatientName,
+          patientName: cleanPatientName
         },
         {
           headers: {
@@ -196,14 +357,41 @@ function AudioRecorder() {
       // 2. Procesar audio con IA REAL (Amazon Transcribe + Bedrock Claude 3) - ASÍNCRONO
       setProcessingStatus('Iniciando procesamiento...')
       
+      // Patient name validation already done at the beginning of the function
+      
+      // DEBUG: Log patient data being sent
+      console.log('🚨 DIAGNÓSTICO CRÍTICO - Datos del paciente que se envían:', {
+        patientName: cleanPatientName,
+        patientNameLength: cleanPatientName.length,
+        patientId: patientData.patientId,
+        age: patientData.age,
+        gender: patientData.gender,
+        specialty: patientData.specialty,
+        fullPatientData: patientData
+      })
+      
+      // Debug logging for development (remove in production)
+      if (config.isDevelopment) {
+        console.log('🔍 Patient data validation:', { cleanPatientName, patientId: patientData.patientId })
+      }
       
       const processResponse = await axios.post(
         config.endpoints.processAudio,
         {
           audioKey: audioKey,
-          doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
-          patientId: patientData.patientId || patientData.patientName,
-          patientName: patientData.patientName,
+          doctorId: 'anonymous', // Will be replaced with real Cognito user ID
+          patientId: patientData.patientId || cleanPatientName,
+          patientName: cleanPatientName,
+          patientDocument: patientData.patientId,
+          age: patientData.age,
+          gender: patientData.gender,
+          phone: patientData.phone || '',
+          email: patientData.email || '',
+          address: patientData.address || '',
+          emergencyContact: patientData.emergencyContact || '',
+          medicalHistory: patientData.medicalHistory || '',
+          allergies: patientData.allergies || '',
+          medications: patientData.medications || '',
           specialty: patientData.specialty
         },
         {
@@ -215,6 +403,11 @@ function AudioRecorder() {
       )
       
       
+      // Debug logging for development
+      if (config.isDevelopment) {
+        console.log('Backend response:', processResponse.data)
+      }
+      
       if (processResponse.data.success) {
         // Processing completed immediately
         setTranscription(processResponse.data.transcription)
@@ -222,6 +415,11 @@ function AudioRecorder() {
         setAnalysis(processResponse.data.aiAnalysis)
         setConsultationId(processResponse.data.consultationId)
         setProcessing(false)
+        
+        // Trigger auto-save after a short delay to ensure state is updated
+        setTimeout(() => {
+          performAutoSave()
+        }, 500)
       } else if (processResponse.data.status === 'processing') {
         // Start polling for completion
         setConsultationId(processResponse.data.consultationId)
@@ -258,7 +456,7 @@ function AudioRecorder() {
         config.endpoints.generatePDF,
         {
           consultationId: consultationId || `consultation-${Date.now()}`, // Usar el ID real o fallback
-          doctorId: 'doctor-demo'
+          doctorId: 'anonymous' // Must match the doctorId used in processAudio for development
         },
         {
           headers: {
@@ -290,7 +488,12 @@ function AudioRecorder() {
 
   const saveToHistory = async () => {
     if (!transcription || !analysis) {
-      setError('No hay datos para guardar. Primero procesa el audio.')
+      Swal.fire({
+        title: 'No hay datos para guardar',
+        text: 'Primero debes procesar el audio antes de guardar la consulta',
+        icon: 'warning',
+        confirmButtonText: 'Entendido'
+      })
       return
     }
     
@@ -303,7 +506,12 @@ function AudioRecorder() {
         const historyResponse = await axios.get(config.endpoints.getHistory)
         
         setError('')
-        alert('✅ Consulta guardada exitosamente en el historial!')
+        Swal.fire({
+          title: '¡Consulta guardada exitosamente!',
+          text: 'La consulta ya estaba guardada en el historial',
+          icon: 'success',
+          confirmButtonText: 'Perfecto'
+        })
       } else {
         // Si no hay consultationId, crear entrada manual
         const saveResponse = await axios.post(
@@ -312,7 +520,7 @@ function AudioRecorder() {
             transcription: transcription,
             transcriptionWithSpeakers: transcriptionWithSpeakers,
             aiAnalysis: analysis,
-            doctorId: 'doctor-authenticated', // Will be replaced with real Cognito user ID
+            doctorId: 'anonymous', // Will be replaced with real Cognito user ID
             patientId: patientData.patientId || patientData.patientName,
             patientName: patientData.patientName,
             specialty: patientData.specialty,
@@ -326,12 +534,22 @@ function AudioRecorder() {
         )
         
         setConsultationId(saveResponse.data.consultationId)
-        alert('✅ Consulta guardada exitosamente en el historial!')
+        Swal.fire({
+          title: '¡Consulta guardada exitosamente!',
+          text: 'La consulta ha sido guardada en el historial',
+          icon: 'success',
+          confirmButtonText: 'Perfecto'
+        })
       }
       
     } catch (error) {
       console.error('Error guardando en historial:', error)
-      setError('Error guardando en historial: ' + error.message)
+      Swal.fire({
+        title: 'Error al guardar',
+        text: 'Hubo un problema al guardar la consulta en el historial: ' + error.message,
+        icon: 'error',
+        confirmButtonText: 'Entendido'
+      })
     }
   }
 
@@ -350,13 +568,21 @@ function AudioRecorder() {
       return
     }
     
-    // Generar ID único si no existe
-    if (!patientData.patientId.trim()) {
-      setPatientData(prev => ({
-        ...prev,
-        patientId: `PAT-${Date.now()}`
-      }))
+    // DEBUG: Log patient data when starting consultation
+    console.log('🔍 DEBUG - Datos del paciente al iniciar consulta:', patientData)
+    console.log('🔍 NOMBRE ESPECÍFICO:', patientData.patientName, 'LONGITUD:', patientData.patientName?.length)
+    
+    // Generar ID único si no existe y actualizar estado de forma síncrona
+    const updatedPatientData = {
+      ...patientData,
+      patientId: patientData.patientId.trim() || `PAT-${Date.now()}`
     }
+    
+    setPatientData(updatedPatientData)
+    
+    // DEBUG: Log updated patient data
+    console.log('🔍 DEBUG - Datos actualizados del paciente:', updatedPatientData)
+    console.log('🔍 NOMBRE ACTUALIZADO:', updatedPatientData.patientName, 'ID:', updatedPatientData.patientId)
     
     setShowPatientForm(false)
     setError('')
@@ -503,6 +729,27 @@ function AudioRecorder() {
                   />
                 </div>
 
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="autoSaveCheck"
+                        checked={autoSaveEnabled}
+                        onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                      />
+                      <label className="form-check-label" htmlFor="autoSaveCheck">
+                        <i className="fas fa-save me-2"></i>
+                        Guardar automáticamente la consulta después del procesamiento con IA
+                      </label>
+                      <small className="form-text text-muted d-block">
+                        Se mostrará una notificación con opción de ir al dashboard
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="d-grid gap-2 d-md-flex justify-content-md-end">
                   <button
                     type="button"
@@ -630,6 +877,13 @@ function AudioRecorder() {
 
               {audioBlob && !isRecording && (
                 <div className="mb-3">
+                  {shouldAutoProcess && !processing && (
+                    <div className="alert alert-info mb-3">
+                      <i className="fas fa-magic me-2"></i>
+                      ¡Iniciando procesamiento automático con IA!
+                    </div>
+                  )}
+                  
                   <button 
                     className="btn btn-success btn-lg"
                     onClick={processAudio}
@@ -638,12 +892,17 @@ function AudioRecorder() {
                     {processing ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2"></span>
-                        {processingStatus || 'Procesando con IA...'}
+                        {processingStatus || 'Procesando automáticamente con IA...'}
+                      </>
+                    ) : transcription ? (
+                      <>
+                        <i className="fas fa-redo me-2"></i>
+                        Reprocesar con IA (AWS)
                       </>
                     ) : (
                       <>
                         <i className="fas fa-brain me-2"></i>
-                        Procesar con IA (AWS)
+                        Procesando automáticamente...
                       </>
                     )}
                   </button>
